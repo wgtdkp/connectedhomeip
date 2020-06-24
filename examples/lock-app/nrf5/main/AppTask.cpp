@@ -34,17 +34,24 @@
 
 #include <platform/CHIPDeviceLayer.h>
 #if CHIP_ENABLE_OPENTHREAD
+#include <openthread/message.h>
+#include <openthread/udp.h>
+#include <platform/OpenThread/OpenThreadUtils.h>
 #include <platform/ThreadStackManager.h>
 #include <platform/internal/DeviceNetworkInfo.h>
 #include <platform/nRF5/ThreadStackManagerImpl.h>
 #endif
+#include <setup_payload/QRCodeSetupPayloadGenerator.h>
+#include <setup_payload/SetupPayload.h>
 #include <support/ErrorStr.h>
+#include <system/SystemClock.h>
 
 #define FACTORY_RESET_TRIGGER_TIMEOUT 3000
 #define FACTORY_RESET_CANCEL_WINDOW_TIMEOUT 3000
 #define APP_TASK_STACK_SIZE (4096)
 #define APP_TASK_PRIORITY 2
 #define APP_EVENT_QUEUE_SIZE 10
+#define EXAMPLE_VENDOR_ID 0xabcd
 
 APP_TIMER_DEF(sFunctionTimer);
 
@@ -158,6 +165,51 @@ int AppTask::Init()
         APP_ERROR_HANDLER(NRF_ERROR_NULL);
     }
 
+    {
+        chip::SetupPayload payload;
+        uint32_t setUpPINCode;
+        uint32_t setUpDiscriminator;
+        ret = ConfigurationMgr().GetSetupPinCode(setUpPINCode);
+        if (ret == CHIP_DEVICE_ERROR_CONFIG_NOT_FOUND)
+        {
+            setUpPINCode = rand() % 100000000;
+            ret          = ConfigurationMgr().StoreSetupPinCode(setUpPINCode);
+            if (ret != CHIP_NO_ERROR)
+            {
+                NRF_LOG_INFO("ConfigurationMgr().StorePairingCode() failed: %s", chip::ErrorStr(ret));
+                APP_ERROR_HANDLER(NRF_ERROR_NULL);
+            }
+        }
+
+        ret = ConfigurationMgr().GetSetupDiscriminator(setUpDiscriminator);
+        if (ret == CHIP_DEVICE_ERROR_CONFIG_NOT_FOUND)
+        {
+            setUpDiscriminator = rand() & 0x3FF;
+            ret                = ConfigurationMgr().StoreSetupDiscriminator(setUpDiscriminator);
+            if (ret != CHIP_NO_ERROR)
+            {
+                NRF_LOG_INFO("ConfigurationMgr().StoreSetupDiscriminator() failed: %s", chip::ErrorStr(ret));
+                APP_ERROR_HANDLER(NRF_ERROR_NULL);
+            }
+        }
+
+        payload.version       = 1;
+        payload.vendorID      = EXAMPLE_VENDOR_ID;
+        payload.productID     = 1;
+        payload.setUpPINCode  = setUpPINCode;
+        payload.discriminator = setUpDiscriminator;
+        chip::QRCodeSetupPayloadGenerator generator(payload);
+
+        std::string result;
+        CHIP_ERROR err = generator.payloadBase41Representation(result);
+        if (err != CHIP_NO_ERROR)
+        {
+            NRF_LOG_ERROR("Failed to generate QR Code");
+        }
+        NRF_LOG_INFO("SetupPINCode: %08d", setUpPINCode);
+        NRF_LOG_INFO("SetupQRCode:  %s", result.c_str());
+    }
+
     return ret;
 }
 
@@ -222,10 +274,55 @@ void AppTask::HandleBLEMessageReceived(chip::Ble::BLEEndPoint * endPoint, chip::
     chip::System::PacketBuffer::Free(buffer);
 }
 
+void SendUDPBroadCast()
+{
+    // TODO: change to CHIP inet layer
+    const char * domainName      = "LightingDemo._chip._udp.local.";
+    chip::Inet::UDPEndPoint * ep = NULL;
+    chip::Inet::IPAddress addr;
+    // chip::Inet::InterfaceId interface;
+    if (!ConnectivityMgrImpl().IsThreadAttached())
+    {
+        return;
+    }
+    ThreadStackMgrImpl().LockThreadStack();
+    otError error = OT_ERROR_NONE;
+    otMessageInfo messageInfo;
+    otUdpSocket mSocket;
+    otMessage * message    = nullptr;
+    uint8_t curArg         = 0;
+    uint16_t payloadLength = 0;
+
+    memset(&mSocket, 0, sizeof(mSocket));
+    memset(&messageInfo, 0, sizeof(messageInfo));
+
+    // Select a address to send
+    const otNetifAddress * otAddrs = otIp6GetUnicastAddresses(ThreadStackMgrImpl().OTInstance());
+    for (const otNetifAddress * otAddr = otAddrs; otAddr != NULL; otAddr = otAddr->mNext)
+    {
+        if (otAddr->mValid && !otAddr->mRloc &&
+            (!addr.IsIPv6ULA() ||
+             ::chip::DeviceLayer::Internal::IsOpenThreadMeshLocalAddress(ThreadStackMgrImpl().OTInstance(), addr)))
+        {
+            memcpy(&messageInfo.mSockAddr, &(otAddr->mAddress), sizeof(otAddr->mAddress));
+            break;
+        }
+    }
+
+    message = otUdpNewMessage(ThreadStackMgrImpl().OTInstance(), nullptr);
+    otIp6AddressFromString("ff03::1", &messageInfo.mPeerAddr);
+    messageInfo.mPeerPort = 23367;
+    otMessageAppend(message, domainName, static_cast<uint16_t>(strlen(domainName)));
+
+    otUdpSend(ThreadStackMgrImpl().OTInstance(), &mSocket, message, &messageInfo);
+    ThreadStackMgrImpl().UnlockThreadStack();
+}
+
 void AppTask::AppTaskMain(void * pvParameter)
 {
     ret_code_t ret;
     AppEvent event;
+    uint64_t mLastChangeTimeUS = 0;
 
     ret = sAppTask.Init();
     if (ret != NRF_SUCCESS)
@@ -300,6 +397,15 @@ void AppTask::AppTaskMain(void * pvParameter)
         sLockLED.Animate();
         sUnusedLED.Animate();
         sUnusedLED_1.Animate();
+
+        uint64_t nowUS            = chip::System::Platform::Layer::GetClock_Monotonic();
+        uint64_t nextChangeTimeUS = mLastChangeTimeUS + 5 * 1000 * 1000UL;
+
+        if (nowUS > nextChangeTimeUS)
+        {
+            SendUDPBroadCast();
+            mLastChangeTimeUS = nowUS;
+        }
     }
 }
 
