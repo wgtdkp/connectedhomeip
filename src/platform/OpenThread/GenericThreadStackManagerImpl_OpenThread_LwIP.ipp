@@ -70,6 +70,9 @@ CHIP_ERROR GenericThreadStackManagerImpl_OpenThread_LwIP<ImplClass>::DoInit(otIn
     // Initialize member data.
     memset(mAddrAssigned, 0, sizeof(mAddrAssigned));
 
+    sThreadNetIf.name[0] = 'o';
+    sThreadNetIf.name[1] = 't';
+
     // Initialize the base class.
     err = GenericThreadStackManagerImpl_OpenThread<ImplClass>::DoInit(otInst);
     SuccessOrExit(err);
@@ -225,8 +228,7 @@ void GenericThreadStackManagerImpl_OpenThread_LwIP<ImplClass>::UpdateThreadInter
                     }
 
                     // Set the address state to PREFERRED or ACTIVE depending on the state in OpenThread.
-                    // netif_ip6_addr_set_state(mNetIf, addrIdx, (otAddr->mPreferred && !otAddr->) ? IP6_ADDR_PREFERRED :
-                    // IP6_ADDR_VALID);
+                    netif_ip6_addr_set_state(mNetIf, addrIdx, (otAddr->mPreferred) ? IP6_ADDR_PREFERRED : IP6_ADDR_VALID);
 
                     // Record that the netif address slot was assigned during this loop.
                     addrAssigned[addrIdx] = true;

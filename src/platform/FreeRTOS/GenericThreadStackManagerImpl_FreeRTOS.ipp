@@ -28,6 +28,7 @@
 
 #include <openthread/joiner.h>
 #include <platform/FreeRTOS/GenericThreadStackManagerImpl_FreeRTOS.h>
+#include <platform/OpenThread/OpenThreadUtils.h>
 #include <platform/ThreadStackManager.h>
 #include <platform/internal/CHIPDeviceLayerInternal.h>
 #include <support/CodeUtils.h>
@@ -176,13 +177,19 @@ void GenericThreadStackManagerImpl_FreeRTOS<ImplClass>::ThreadTaskMain(void * ar
 
     TimerHandle_t tmr = xTimerCreate("JoinerTimer", pdMS_TO_TICKS(3000), pdTRUE, (void *) self, &HandleJoinerTimer);
 
+    xTimerStart(tmr, 0);
+
     while (true)
     {
         if (self->mJoinPending)
         {
             self->mJoinPending = false;
-            self->Impl()->_JoinerStart(pskd);
-            xTimerStart(tmr, 0);
+
+            if (self->Impl()->_JoinerStart(pskd) == CHIP_CONFIG_OPENTHREAD_ERROR_MIN + OT_ERROR_INVALID_STATE)
+            {
+                // already joined
+                xTimerStop(tmr, 0);
+            }
         }
 
         // Lock the Thread stack.

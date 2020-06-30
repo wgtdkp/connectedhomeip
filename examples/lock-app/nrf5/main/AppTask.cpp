@@ -64,6 +64,7 @@ static LEDWidget sStatusLED;
 static LEDWidget sLockLED;
 static LEDWidget sUnusedLED;
 static LEDWidget sUnusedLED_1;
+static LEDWidget sLightBulb;
 
 static bool sIsThreadProvisioned     = false;
 static bool sIsThreadEnabled         = false;
@@ -106,8 +107,11 @@ int AppTask::Init()
     // Initialize LEDs
     sStatusLED.Init(SYSTEM_STATE_LED);
 
+    sLightBulb.Init(3);
+    sLightBulb.Set(false);
+
     sLockLED.Init(LOCK_STATE_LED);
-    sLockLED.Set(!BoltLockMgr().IsUnlocked());
+    sLockLED.Set(false);
 
     sUnusedLED.Init(BSP_LED_2);
     sUnusedLED_1.Init(BSP_LED_3);
@@ -526,10 +530,12 @@ void AppTask::ActionInitiated(BoltLockManager::Action_t aAction, int32_t aActor)
     // and start flashing the LEDs rapidly to indicate action initiation.
     if (aAction == BoltLockManager::LOCK_ACTION)
     {
+        sLightBulb.Set(false);
         NRF_LOG_INFO("Lock Action has been initiated")
     }
     else if (aAction == BoltLockManager::UNLOCK_ACTION)
     {
+        sLightBulb.Set(true);
         NRF_LOG_INFO("Unlock Action has been initiated")
     }
 
