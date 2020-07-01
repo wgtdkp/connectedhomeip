@@ -844,7 +844,8 @@ CHIP_ERROR GenericThreadStackManagerImpl_OpenThread<ImplClass>::_JoinerStart(con
     otError error;
 
     Impl()->LockThreadStack();
-    VerifyOrExit(!otDatasetIsCommissioned(mOTInst), error = OT_ERROR_INVALID_STATE);
+    VerifyOrExit(!otDatasetIsCommissioned(mOTInst) && otThreadGetDeviceRole(mOTInst) == OT_DEVICE_ROLE_DISABLED,
+                 error = OT_ERROR_INVALID_STATE);
     VerifyOrExit(otJoinerGetState(mOTInst) == OT_JOINER_STATE_IDLE, error = OT_ERROR_BUSY;);
 
     if (!otIp6IsEnabled(mOTInst))

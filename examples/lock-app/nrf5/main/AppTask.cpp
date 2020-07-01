@@ -107,8 +107,8 @@ int AppTask::Init()
     // Initialize LEDs
     sStatusLED.Init(SYSTEM_STATE_LED);
 
-    sLightBulb.Init(3);
-    sLightBulb.Set(false);
+    sLightBulb.Init(28);
+    sLightBulb.Set(true);
 
     sLockLED.Init(LOCK_STATE_LED);
     sLockLED.Set(false);
