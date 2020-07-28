@@ -30,6 +30,9 @@ import com.google.chip.chiptool.setuppayloadscanner.BarcodeReaderActivity;
 
 public class CHIPToolActivity extends AppCompatActivity {
 
+  public static final String ACTION_COMMISSIONING = "com.google.chip.chiptool.commissioner.COMMISSION";
+  public static final int REQUEST_CODE_COMMISSIONING = 0xB003;
+
   private static int BARCODE_READER_ACTIVITY_REQUEST = 100;
 
   @Override
@@ -81,6 +84,16 @@ public class CHIPToolActivity extends AppCompatActivity {
             public void onClick(View v) {
               Intent intent = new Intent(activity, OnOffActivity.class);
               startActivityForResult(intent, OnOffActivity.ON_OFF_ACTIVITY_REQUEST);
+            }
+          });
+
+      button = (Button) view.findViewById(R.id.commissioning_button);
+      button.setOnClickListener(
+          new View.OnClickListener() {
+            public void onClick(View v) {
+              Intent intent = new Intent(ACTION_COMMISSIONING);
+              intent.setClass(activity, BarcodeReaderActivity.class);
+              startActivityForResult(intent, REQUEST_CODE_COMMISSIONING);
             }
           });
     }

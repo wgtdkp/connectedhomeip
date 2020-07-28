@@ -18,11 +18,15 @@
 
 package com.google.chip.chiptool.setuppayloadscanner;
 
+import android.content.Intent;
 import android.os.Bundle;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
+import com.google.chip.chiptool.CHIPToolActivity;
 import com.google.chip.chiptool.R;
+import com.google.chip.chiptool.commissioner.CommissionerActivity;
+import com.google.chip.chiptool.commissioner.Constants;
 import com.google.chip.chiptool.setuppayloadscanner.BarcodeFragment.Callback;
 
 /** Launches the QR code scanner and shows the details of any detected CHIP device QR codes. */
@@ -30,10 +34,14 @@ public class BarcodeReaderActivity extends AppCompatActivity implements Callback
 
   private static final String TAG = BarcodeReaderActivity.class.getSimpleName();
 
+  private Intent intent;
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.barcode_activity);
+
+    intent = getIntent();
 
     ActionBar actionBar = getSupportActionBar();
     if (actionBar != null) {
@@ -47,7 +55,16 @@ public class BarcodeReaderActivity extends AppCompatActivity implements Callback
 
   @Override
   public void onCHIPDeviceInfoReceived(CHIPDeviceInfo deviceInfo) {
-    showFragment(CHIPDeviceDetailsFragment.newInstance(deviceInfo));
+    if (CHIPToolActivity.ACTION_COMMISSIONING.equals(intent.getAction())) {
+      Intent intent = new Intent(CHIPToolActivity.ACTION_COMMISSIONING);
+      intent.setClass(this, CommissionerActivity.class);
+
+      intent.putExtra(Constants.KEY_DEVICE_INFO, deviceInfo);
+
+      startActivityForResult(intent, CHIPToolActivity.REQUEST_CODE_COMMISSIONING);
+    } else {
+      showFragment(CHIPDeviceDetailsFragment.newInstance(deviceInfo));
+    }
   }
 
   private void addFragment(Fragment fragment) {
