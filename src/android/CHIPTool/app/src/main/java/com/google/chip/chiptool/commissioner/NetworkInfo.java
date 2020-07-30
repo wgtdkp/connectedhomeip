@@ -2,6 +2,7 @@ package com.google.chip.chiptool.commissioner;
 
 import android.os.Parcel;
 import android.os.Parcelable;
+import java.net.InetAddress;
 import java.util.ArrayList;
 
 public class NetworkInfo implements Parcelable {
@@ -12,6 +13,10 @@ public class NetworkInfo implements Parcelable {
     borderAgents = new ArrayList<>();
     borderAgents.add(borderAgent);
   }
+
+  public InetAddress getHost() { return borderAgents.get(0).host; }
+
+  public int getPort() { return borderAgents.get(0).port; }
 
   public String getNetworkName() {
     return borderAgents.get(0).networkName;

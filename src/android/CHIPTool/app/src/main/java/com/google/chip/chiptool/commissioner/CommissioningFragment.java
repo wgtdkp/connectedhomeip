@@ -22,6 +22,7 @@ import androidx.work.WorkManager;
 import androidx.work.WorkRequest;
 import com.google.chip.chiptool.R;
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo;
+import com.google.gson.Gson;
 
 public class CommissioningFragment extends Fragment implements Observer<WorkInfo> {
 
@@ -50,8 +51,8 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
     networkInfo = getArguments().getParcelable(Constants.KEY_NETWORK_INFO);
 
     Data arguments = new Data.Builder()
-            .putByteArray(Constants.KEY_DEVICE_INFO, marshall(deviceInfo))
-            .putByteArray(Constants.KEY_DEVICE_INFO, marshall(networkInfo))
+            .putString(Constants.KEY_DEVICE_INFO, new Gson().toJson(deviceInfo))
+            .putString(Constants.KEY_DEVICE_INFO, new Gson().toJson(networkInfo))
             .build();
     WorkRequest commssionerWorkRequest = new OneTimeWorkRequest.Builder(CommissionerWorker.class).setInputData(arguments).build();
 
@@ -129,20 +130,5 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
 
     Button doneButton = getActivity().findViewById(R.id.done_button);
     doneButton.setVisibility(View.VISIBLE);
-  }
-
-  private static byte[] marshall(Parcelable parcelable) {
-    Parcel parcel = Parcel.obtain();
-    parcelable.writeToParcel(parcel, 0);
-    return parcel.marshall();
-  }
-
-  private static <T> T unmarshall(byte[] bytes, Parcelable.Creator<T> creator) {
-    Parcel parcel = Parcel.obtain();
-    parcel.unmarshall(bytes, 0, bytes.length);
-    parcel.setDataPosition(0);
-    T result = creator.createFromParcel(parcel);
-    parcel.recycle();
-    return result;
   }
 }
