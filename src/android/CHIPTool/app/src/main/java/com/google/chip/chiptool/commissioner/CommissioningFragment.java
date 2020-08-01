@@ -31,6 +31,8 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
   private CHIPDeviceInfo deviceInfo;
   private NetworkInfo networkInfo;
 
+  WorkRequest commssionerWorkRequest;
+
   @Override
   public View onCreateView(
       LayoutInflater inflater, ViewGroup container,
@@ -54,7 +56,7 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
             .putString(Constants.KEY_DEVICE_INFO, new Gson().toJson(deviceInfo))
             .putString(Constants.KEY_DEVICE_INFO, new Gson().toJson(networkInfo))
             .build();
-    WorkRequest commssionerWorkRequest = new OneTimeWorkRequest.Builder(CommissionerWorker.class).setInputData(arguments).build();
+    commssionerWorkRequest = new OneTimeWorkRequest.Builder(CommissionerWorker.class).setInputData(arguments).build();
 
     WorkManager.getInstance(getActivity()).enqueue(commssionerWorkRequest);
 
@@ -64,18 +66,18 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
     view.findViewById(R.id.cancel_button).setOnClickListener(new View.OnClickListener() {
       @Override
       public void onClick(View view) {
+        WorkManager.getInstance(getActivity()).cancelWorkById(commssionerWorkRequest.getId());
+
         CommissionerActivity commissionerActivity = (CommissionerActivity)getActivity();
         commissionerActivity.finishCommissioning(Activity.RESULT_CANCELED);
-        //NavHostFragment.findNavController(SelectNetworkFragment.this)
-        //    .navigate(R.id.action_select_network_to_commissioning);
       }
     });
 
     view.findViewById(R.id.done_button).setOnClickListener(new View.OnClickListener() {
       @Override
       public void onClick(View view) {
-        CommissionerActivity serviceActivity = (CommissionerActivity)getActivity();
-        serviceActivity.finishCommissioning(Activity.RESULT_OK);
+        CommissionerActivity commissionerActivity = (CommissionerActivity)getActivity();
+        commissionerActivity.finishCommissioning(Activity.RESULT_OK);
       }
     });
   }
@@ -87,7 +89,8 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
 
     if (workInfo != null) {
       if (workInfo.getState().isFinished()) {
-        showCommissionDone(workInfo.getOutputData().getString(Constants.KEY_COMMISSIONING_STATUS));
+
+        showCommissionDone(workInfo.getOutputData().getBoolean(Constants.KEY_SUCCESS, false), workInfo.getOutputData().getString(Constants.KEY_COMMISSIONING_STATUS));
       } else {
         showInProgress(workInfo.getProgress().getString(Constants.KEY_COMMISSIONING_STATUS));
       }
@@ -109,11 +112,14 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
     ImageView doneImage = getActivity().findViewById(R.id.done_image);
     doneImage.setVisibility(View.GONE);
 
+    ImageView errorImage = getActivity().findViewById(R.id.error_image);
+    errorImage.setVisibility(View.GONE);
+
     Button doneButton = getActivity().findViewById(R.id.done_button);
     doneButton.setVisibility(View.GONE);
   }
 
-  private void showCommissionDone(String status) {
+  private void showCommissionDone(Boolean success, String status) {
     TextView statusText = getActivity().findViewById(R.id.status_text);
     if (status != null) {
       statusText.setText(status);
@@ -125,8 +131,13 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
     Button cancelButton = getActivity().findViewById(R.id.cancel_button);
     cancelButton.setVisibility(View.GONE);
 
-    ImageView doneImage = getActivity().findViewById(R.id.done_image);
-    doneImage.setVisibility(View.VISIBLE);
+    if (success) {
+      ImageView doneImage = getActivity().findViewById(R.id.done_image);
+      doneImage.setVisibility(View.VISIBLE);
+    } else {
+      ImageView errorImage = getActivity().findViewById(R.id.error_image);
+      errorImage.setVisibility(View.VISIBLE);
+    }
 
     Button doneButton = getActivity().findViewById(R.id.done_button);
     doneButton.setVisibility(View.VISIBLE);

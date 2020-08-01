@@ -79,9 +79,14 @@ public class BorderAgentDiscoverer implements NsdManager.DiscoveryListener  {
 
         Map<String, byte[]> attrs = serviceInfo.getAttributes();
 
+        String discriminator = "CC11BB22";
+
         try {
+          if (attrs.containsKey(KEY_DISCRIMINATOR)) {
+            discriminator = new String(attrs.get(KEY_DISCRIMINATOR));
+          }
           final BorderAgentInfo borderAgent = new BorderAgentInfo(
-                  new String(attrs.get(KEY_DISCRIMINATOR)),
+                  discriminator,
                   new String(attrs.get(KEY_NETWORK_NAME)),
                   attrs.get(KEY_EXTENDED_PAN_ID),
                   serviceInfo.getHost(),

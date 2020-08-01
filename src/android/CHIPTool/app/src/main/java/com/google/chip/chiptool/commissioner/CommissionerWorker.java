@@ -1,8 +1,6 @@
 package com.google.chip.chiptool.commissioner;
 
 import android.content.Context;
-import android.net.Network;
-import android.os.Parcelable;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.work.Data;
@@ -22,8 +20,8 @@ import io.openthread.commissioner.CommissionerHandler;
 import io.openthread.commissioner.ErrorCode;
 import io.openthread.commissioner.Logger;
 import io.openthread.commissioner.LogLevel;
-import java.math.BigInteger;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 class NativeCommissionerLogger extends Logger {
     private static final String TAG = "NativeCommissioner";
@@ -89,20 +87,34 @@ public class CommissionerWorker extends Worker {
     private CHIPDeviceInfo deviceInfo;
     private NetworkInfo networkInfo;
 
-    private boolean curJoinerCommissioned = false;
+    private AtomicBoolean curJoinerCommissioned = new AtomicBoolean(false);
+
+    private static Commissioner nativeCommissioner;
 
     public CommissionerWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
         super(context, workerParams);
 
         deviceInfo = new Gson().fromJson(getInputData().getString(Constants.KEY_DEVICE_INFO), CHIPDeviceInfo.class);
         networkInfo = new Gson().fromJson(getInputData().getString(Constants.KEY_DEVICE_INFO), NetworkInfo.class);
+
+        nativeCommissioner = Commissioner.create(new NativeCommissionerHandler(this));
+
+        ByteArray pskc = new ByteArray(new short[]{0x3a, 0xa5, 0x5f, 0x91, 0xca, 0x47, 0xd1, 0xe4, 0xe7, 0x1a, 0x08, 0xcb, 0x35, 0xe9, 0x15, 0x91});
+        Config config = new Config();
+        config.setId("TestComm");
+        config.setDomainName("TestDomain");
+        config.setEnableCcm(false);
+        config.setPSKc(pskc);
+        config.setLogger(new NativeCommissionerLogger());
+
+        nativeCommissioner.init(config);
     }
 
     String getPskd() {
         final int pskdLength = 27 / 5 + 1;
         StringBuilder str = new StringBuilder();
 
-        for (int i = 0; i < pskdLength - 1; ++i) {
+        for (int i = 0; i < pskdLength; ++i) {
             str.append("0123456789ABCDEFGHJKLMNPRSTUVWXY".charAt(((int)deviceInfo.getSetupPinCode() >> (i * 5)) & ((1 << 5) - 1)));
         }
 
@@ -124,68 +136,79 @@ public class CommissionerWorker extends Worker {
     public Result doWork() {
         setProgressAsync(StateToData("commissioning..."));
 
-        Commissioner nativeCommissioner = Commissioner.create(new NativeCommissionerHandler(this));
-        ByteArray pskc = new ByteArray(new short[]{0x3a, 0xa5, 0x5f, 0x91, 0xca, 0x47, 0xd1, 0xe4, 0xe7, 0x1a, 0x08, 0xcb, 0x35, 0xe9, 0x15, 0x91});
-        Config config = new Config();
-        config.setId("TestComm");
-        config.setDomainName("TestDomain");
-        config.setEnableCcm(false);
-        config.setPSKc(pskc);
-        config.setLogger(new NativeCommissionerLogger());
-
-        Error error = nativeCommissioner.init(config);
-        if (error.getCode() != ErrorCode.kNone) {
-            return errorToResult(error);
+        if (nativeCommissioner != null) {
+            nativeCommissioner.resign();
         }
+
+        //Error error = nativeCommissioner.init(config);
+        //if (error.getCode() != ErrorCode.kNone) {
+        //    return errorToResult(error);
+        //}
 
         String[] existingCommissionerId = new String[1];
-        error = nativeCommissioner.petition(existingCommissionerId, networkInfo.getHost().getHostAddress(), networkInfo.getPort());
+        Error error = nativeCommissioner.petition(existingCommissionerId, networkInfo.getHost().getHostAddress(), networkInfo.getPort());
         if (error.getCode() != ErrorCode.kNone) {
             return errorToResult(error);
         }
 
-        if (!nativeCommissioner.isActive()) {
-            return Result.failure(StateToData("the commissioner is not active"));
-        }
+        setProgressAsync(StateToData("commissioner connected"));
 
-        curJoinerCommissioned = false;
+        curJoinerCommissioned.set(false);
 
-        ByteArray steeringData = new ByteArray();
-        Commissioner.addJoiner(steeringData, getJoinerId());
+        ByteArray steeringData = new ByteArray(new short[] {0xFF});
+        //Commissioner.addJoiner(steeringData, getJoinerId());
         CommissionerDataset commDataset = new CommissionerDataset();
         commDataset.setSteeringData(steeringData);
         commDataset.setPresentFlags(commDataset.getPresentFlags() | CommissionerDataset.kSteeringDataBit);
 
         error = nativeCommissioner.setCommissionerDataset(commDataset);
         if (error.getCode() != ErrorCode.kNone) {
+            nativeCommissioner.resign();
             return errorToResult(error);
         }
 
-        for (int i = 0; i < 15; ++i) {
-            if (curJoinerCommissioned) {
+        setProgressAsync(StateToData("waiting for new device...\nPSKD: " + getPskd()));
+
+        // Wait 200 seconds for a joiner.
+        for (int i = 0; i < 200; ++i) {
+            if (curJoinerCommissioned.get()) {
                 break;
             }
 
             try {
-                TimeUnit.SECONDS.sleep(3);
+                TimeUnit.SECONDS.sleep(1);
             } catch (InterruptedException e) {
                 Log.d(TAG, "interrupted exception");
             }
         }
 
-        if (!curJoinerCommissioned) {
-            return Result.failure(StateToData("timeout"));
+        if (!curJoinerCommissioned.get()) {
+            nativeCommissioner.resign();
+            return errorToResult(new Error(ErrorCode.kTimeout, "No joiner is pairing"));
         }
 
         nativeCommissioner.resign();
 
-        return Result.success(StateToData("commission device success!"));
+        return errorToResult(new Error(ErrorCode.kNone, ""));
+    }
+
+    @Override
+    public void onStopped() {
+        if (nativeCommissioner != null) {
+            nativeCommissioner.resign();
+        }
     }
 
     private Result errorToResult(Error error) {
+        Data.Builder dataBuilder = new Data.Builder();
+
         if (error.getCode() == ErrorCode.kNone) {
-            return Result.success(StateToData("commission device success!"));
+            dataBuilder.putString(Constants.KEY_COMMISSIONING_STATUS, "commission device success!");
+            dataBuilder.putBoolean(Constants.KEY_SUCCESS, true);
+            return Result.success(dataBuilder.build());
         } else {
+            dataBuilder.putString(Constants.KEY_COMMISSIONING_STATUS, error.toString());
+            dataBuilder.putBoolean(Constants.KEY_SUCCESS, false);
             return Result.failure(StateToData(error.toString()));
         }
     }
@@ -195,6 +218,6 @@ public class CommissionerWorker extends Worker {
     }
 
     public void onJoinerFinalize(ByteArray joinerId) {
-
+        curJoinerCommissioned.set(true);
     }
 }

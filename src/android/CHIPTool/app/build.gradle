@@ -22,10 +22,17 @@ android {
         externalNativeBuild {
             // For ndk-build, instead use the ndkBuild block.
             cmake {
-                arguments "-DBUILD_SHARED_LIBS=ON", "-DOT_COMM_ANDROID=ON", "-DOT_COMM_JAVA_BINDING=ON", "-DOT_COMM_APP=OFF", "-DOT_COMM_CCM=OFF", "-DOT_COMM_COVERAGE=OFF", "-DOT_COMM_TEST=OFF"
+                arguments "-DBUILD_SHARED_LIBS=ON",
+                          "-DOT_COMM_ANDROID=ON",
+                          "-DOT_COMM_JAVA_BINDING=ON",
+                          "-DOT_COMM_APP=OFF",
+                          "-DOT_COMM_CCM=OFF",
+                          "-DOT_COMM_COVERAGE=OFF",
+                          "-DOT_COMM_TEST=OFF",
+                          "-DOT_COMM_JAVA_BINDING_OUTDIR=$projectDir/src/main/java"
                 // Specifies the library and executable targets from your CMake project
                 // that Gradle should build.
-                targets "commissioner-java"
+                targets "commissioner-java", "event_core_shared", "event_pthreads_shared"
             }
         }
     }
@@ -53,6 +60,10 @@ android {
             path "../../../../third_party/ot-commissioner/repo/CMakeLists.txt"
         }
     }
+}
+
+project.afterEvaluate {
+    javaPreCompileDebug.dependsOn externalNativeBuildDebug
 }
 
 dependencies {
