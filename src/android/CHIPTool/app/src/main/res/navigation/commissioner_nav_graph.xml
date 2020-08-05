@@ -3,7 +3,17 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:id="@+id/nav_graph"
-    app:startDestination="@id/commissioner_select_network_fragment">
+    app:startDestination="@id/commissioner_scan_qr_code_fragment">
+
+  <fragment
+      android:id="@+id/commissioner_scan_qr_code_fragment"
+      android:name="com.google.chip.chiptool.setuppayloadscanner.BarcodeFragment"
+      tools:layout="@layout/barcode_fragment">
+
+    <action
+        android:id="@+id/action_scan_qr_code_to_select_network"
+        app:destination="@id/commissioner_select_network_fragment" />
+  </fragment>
 
   <fragment
       android:id="@+id/commissioner_select_network_fragment"

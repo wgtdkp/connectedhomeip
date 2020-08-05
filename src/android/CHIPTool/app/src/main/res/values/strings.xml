@@ -25,6 +25,7 @@
     <string name="enter_ip_address_hint_text">Enter IP Address (eg. 192.168.10.2)</string>
     <string name="echo_input_hint_text">Enter message for device</string>
 
+    <string name="commissioner_commissioning">Commissioning</string>
     <string name="commissioner_name">Commissioner</string>
     <string name="commissioner_scan_device">Scan Device</string>
     <string name="commissioner_cancel">Cancel</string>
