@@ -15,6 +15,16 @@
     <string name="camera_unavailable_alert_subtitle">Error launching camera to scan the QR code.</string>
     <string name="camera_unavailable_alert_exit">Exit</string>
 
+    <string name="send_echo_btn_text">Send echo</string>
+    <string name="echo_status_connecting">Connecting…</string>
+    <string name="echo_status_sending_message">Sending message…</string>
+    <string name="echo_status_response">Received echo response:\n\n%1$s</string>
+    <string name="scan_qr_code_btn_text">Scan QR Code</string>
+    <string name="echo_client_btn_text">Echo Client</string>
+    <string name="on_off_btn_text">Light On/Off Cluster</string>
+    <string name="enter_ip_address_hint_text">Enter IP Address (eg. 192.168.10.2)</string>
+    <string name="echo_input_hint_text">Enter message for device</string>
+
     <string name="commissioner_name">Commissioner</string>
     <string name="commissioner_scan_device">Scan Device</string>
     <string name="commissioner_cancel">Cancel</string>
@@ -23,7 +33,6 @@
     <string name="commissioner_your_device">Your Device</string>
     <string name="commissioner_select_network">Select Network</string>
     <string name="commissioner_commission_device">Commission Device</string>
-
     <string name="commissioner_scan_qrcode_fragment_label">Scan QR Code</string>
     <string name="commissioner_select_network_fragment_label">Select Network</string>
     <string name="commissioner_commissioning_fragment_label">Commissioning</string>

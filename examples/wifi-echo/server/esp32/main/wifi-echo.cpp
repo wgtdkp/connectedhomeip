@@ -24,6 +24,7 @@
 #include "LEDWidget.h"
 #include "ListScreen.h"
 #include "QRCodeScreen.h"
+#include "RendezvousSession.h"
 #include "ScreenManager.h"
 #include "WiFiWidget.h"
 #include "esp_event_loop.h"
@@ -53,7 +54,6 @@ using namespace ::chip;
 using namespace ::chip::DeviceLayer;
 
 extern void startServer();
-extern void startBle();
 
 #if CONFIG_USE_ECHO_CLIENT
 extern void startClient(void);
@@ -86,10 +86,6 @@ extern void startClient(void);
 #define EXAMPLE_VENDOR_ID 2447
 // Spells ESP32 on a dialer
 #define EXAMPLE_PRODUCT_ID 37732
-// Used to have an initial shared secret
-#define EXAMPLE_SETUP_CODE 123456789
-// Used to discriminate the device
-#define EXAMPLE_DISCRIMINATOR 0X0F00
 // Used to indicate that an IP address has been added to the QRCode
 #define EXAMPLE_VENDOR_TAG_IP 1
 
@@ -109,6 +105,7 @@ WiFiWidget wifiLED;
 const char * TAG = "wifi-echo-demo";
 
 static EchoDeviceCallbacks EchoCallbacks;
+RendezvousSession * rendezvousSession = nullptr;
 
 namespace {
 
@@ -360,16 +357,33 @@ bool isRendezvousBLE()
 
 std::string createSetupPayload()
 {
+    CHIP_ERROR err = CHIP_NO_ERROR;
+    string result;
+
+    uint32_t discriminator;
+    err = ConfigurationMgr().GetSetupDiscriminator(discriminator);
+    if (err != CHIP_NO_ERROR)
+    {
+        ESP_LOGE(TAG, "Couldn't get discriminator: %d", err);
+        return result;
+    }
+
+    uint32_t setupPINCode;
+    err = ConfigurationMgr().GetSetupPinCode(setupPINCode);
+    if (err != CHIP_NO_ERROR)
+    {
+        ESP_LOGE(TAG, "Couldn't get setupPINCode: %d", err);
+        return result;
+    }
+
     SetupPayload payload;
     payload.version               = 1;
-    payload.discriminator         = EXAMPLE_DISCRIMINATOR;
-    payload.setUpPINCode          = EXAMPLE_SETUP_CODE;
+    payload.discriminator         = discriminator;
+    payload.setUpPINCode          = setupPINCode;
     payload.rendezvousInformation = static_cast<RendezvousInformationFlags>(CONFIG_RENDEZVOUS_MODE);
     payload.vendorID              = EXAMPLE_VENDOR_ID;
     payload.productID             = EXAMPLE_PRODUCT_ID;
 
-    CHIP_ERROR err = CHIP_NO_ERROR;
-    string result;
     if (!isRendezvousBLE())
     {
         char gw_ip[INET6_ADDRSTRLEN];
@@ -449,7 +463,7 @@ extern "C" void app_main()
 
     if (isRendezvousBLE())
     {
-        startBle();
+        rendezvousSession = new RendezvousSession(&bluetoothLED);
     }
 
 #if CONFIG_USE_ECHO_CLIENT

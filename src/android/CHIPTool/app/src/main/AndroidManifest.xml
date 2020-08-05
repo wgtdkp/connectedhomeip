@@ -20,14 +20,6 @@
             </intent-filter>
         </activity>
         <activity
-            android:name=".setuppayloadscanner.BarcodeReaderActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"/>
-        <activity
-            android:name=".EchoClientActivity"
-            android:exported="false"
-            android:screenOrientation="portrait"/>
-        <activity
             android:name=".OnOffActivity"
             android:exported="false"
             android:screenOrientation="portrait"/>
