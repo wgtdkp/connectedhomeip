@@ -44,7 +44,7 @@ public class CommissionerActivity extends AppCompatActivity implements BarcodeFr
     if (controller.getCurrentDestination().getId() == R.id.commissioner_scan_qr_code_fragment) {
       Bundle bundle = new Bundle();
       bundle.putParcelable(Constants.KEY_DEVICE_INFO, deviceInfo);
-      controller.navigate(R.id.action_select_network_to_commissioning, bundle);
+      controller.navigate(R.id.action_scan_qr_code_to_select_network, bundle);
     }
   }
 
