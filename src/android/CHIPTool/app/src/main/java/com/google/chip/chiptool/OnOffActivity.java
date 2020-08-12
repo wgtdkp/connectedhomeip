@@ -43,8 +43,20 @@ public class OnOffActivity extends AppCompatActivity implements View.OnClickList
   public static class OnOffFragment extends Fragment {
     OnOffActivity activity;
 
+    private CommissionedDeviceAdapter deviceAdapter;
+    private CommissionedDeviceDiscoverer deviceDiscoverer;
+
     OnOffFragment(OnOffActivity activity) {
       this.activity = activity;
+    }
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
+
+      deviceAdapter = new CommissionedDeviceAdapter(getContext());
+      deviceDiscoverer = new CommissionedDeviceDiscoverer(getContext(), deviceAdapter);
+      deviceDiscoverer.start();
     }
 
     @Override
@@ -72,6 +84,13 @@ public class OnOffActivity extends AppCompatActivity implements View.OnClickList
     @Override
     public void onViewCreated(View view, Bundle savedInstanceState) {
       super.onViewCreated(view, savedInstanceState);
+    }
+
+    @Override
+    public void onDestroy() {
+      super.onDestroy();
+
+      deviceDiscoverer.stop();
     }
   }
 

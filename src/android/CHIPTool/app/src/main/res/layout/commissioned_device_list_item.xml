@@ -1,0 +1,36 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.constraintlayout.widget.ConstraintLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/commissioned_device_list_item"
+    android:layout_width="match_parent"
+    android:layout_height="50dp">
+
+  <androidx.appcompat.widget.AppCompatImageView
+      android:id="@+id/device_icon"
+      android:layout_width="40dp"
+      android:layout_height="40dp"
+      android:layout_marginStart="5dp"
+      app:layout_constraintEnd_toStartOf="@+id/device_name"
+      app:layout_constraintStart_toStartOf="parent"
+      app:layout_constraintTop_toTopOf="parent"
+      app:srcCompat="@drawable/ic_bulb_icon"></androidx.appcompat.widget.AppCompatImageView>
+
+  <TextView
+      android:id="@+id/device_name"
+      style="@style/info_text"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="20dp"
+      app:layout_constraintBottom_toBottomOf="@+id/device_icon"
+      app:layout_constraintStart_toEndOf="@+id/device_icon"
+      app:layout_constraintTop_toTopOf="@+id/device_icon"></TextView>
+
+  <TextView
+      android:id="@+id/device_ip_address"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_marginStart="20dp"
+      app:layout_constraintStart_toEndOf="@+id/device_icon"
+      app:layout_constraintTop_toBottomOf="@+id/device_name"></TextView>
+
+</androidx.constraintlayout.widget.ConstraintLayout>

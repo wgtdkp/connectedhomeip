@@ -66,4 +66,27 @@
         android:minLines="4"
         android:textSize="20sp"/>
 
+    <TextView
+        style="@style/title_text"
+        android:id="@+id/commissionedDeviceText"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/commandStatusTv"
+        android:text="@string/commissioned_devices" />
+
+    <View
+        android:id="@+id/device_list_top_separator"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:layout_marginTop="2dp"
+        android:background="@android:color/darker_gray"
+        android:layout_below="@id/commissionedDeviceText" />
+    <ListView
+        android:id="@+id/commissionedDeviceList"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:choiceMode="singleChoice"
+        android:listSelector="#bbbbbb"
+        android:layout_below="@id/device_list_top_separator"/>
+
 </RelativeLayout>

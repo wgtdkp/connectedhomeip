@@ -5,19 +5,40 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import android.widget.AdapterView.OnItemClickListener
+import android.widget.ListView
 import androidx.fragment.app.Fragment
 import chip.devicecontroller.ChipCommandType
 import chip.devicecontroller.ChipDeviceController
 import com.google.chip.chiptool.ChipClient
+import com.google.chip.chiptool.CommissionedDeviceAdapter
+import com.google.chip.chiptool.CommissionedDeviceDiscoverer
+import com.google.chip.chiptool.CommissionedDeviceInfo
 import com.google.chip.chiptool.R
-import kotlinx.android.synthetic.main.on_off_client_fragment.*
-import kotlinx.android.synthetic.main.on_off_client_fragment.view.*
+import com.google.chip.chiptool.commissioner.NetworkInfo
+import kotlinx.android.synthetic.main.on_off_client_fragment.commandStatusTv
+import kotlinx.android.synthetic.main.on_off_client_fragment.ipAddressEd
+import kotlinx.android.synthetic.main.on_off_client_fragment.view.offBtn
+import kotlinx.android.synthetic.main.on_off_client_fragment.view.onBtn
+import kotlinx.android.synthetic.main.on_off_client_fragment.view.toggleBtn
+import kotlinx.android.synthetic.main.on_off_client_fragment.view.commissionedDeviceList
 
 class OnOffClientFragment : Fragment(), ChipDeviceController.CompletionListener {
   private val deviceController: ChipDeviceController
     get() = ChipClient.getDeviceController()
 
   private var commandType: ChipCommandType? = null
+
+  private var deviceAdapter: CommissionedDeviceAdapter? = null
+  private var deviceDiscoverer: CommissionedDeviceDiscoverer? = null
+
+  override fun onCreate(savedInstanceState: Bundle?) {
+    super.onCreate(savedInstanceState)
+
+    deviceAdapter = CommissionedDeviceAdapter(context)
+    deviceDiscoverer = CommissionedDeviceDiscoverer(context, deviceAdapter)
+    deviceDiscoverer!!.start()
+  }
 
   override fun onCreateView(
       inflater: LayoutInflater,
@@ -30,7 +51,20 @@ class OnOffClientFragment : Fragment(), ChipDeviceController.CompletionListener 
       onBtn.setOnClickListener { sendOnCommandClick() }
       offBtn.setOnClickListener { sendOffCommandClick() }
       toggleBtn.setOnClickListener { sendToggleCommandClick() }
+
+      commissionedDeviceList.adapter = deviceAdapter
+
+      commissionedDeviceList.onItemClickListener =
+        OnItemClickListener { adapterView, view, position, id ->
+          var selectedDevice = deviceAdapter?.getItem(position) as CommissionedDeviceInfo
+          ipAddressEd.setText(selectedDevice.ipAddress.getHostAddress())
+        }
     }
+  }
+
+  override fun onDestroy() {
+    super.onDestroy()
+    deviceDiscoverer?.stop()
   }
 
   override fun onConnectDeviceComplete() {
