@@ -32,39 +32,63 @@
 #include <core/ReferenceCounted.h>
 #include <inet/IPAddress.h>
 #include <inet/IPEndPointBasis.h>
+#include <transport/Base.h>
 #include <transport/PeerConnections.h>
 #include <transport/SecureSession.h>
-#include <transport/UDP.h>
+#include <transport/Tuple.h>
 
 namespace chip {
 
 using namespace System;
 
-class DLL_EXPORT SecureSessionMgr : public ReferenceCounted<SecureSessionMgr>
+class SecureSessionMgrBase;
+
+/**
+ * @brief
+ *   This class provides a skeleton for the callback functions. The functions will be
+ *   called by SecureSssionMgrBase object on specific events. If the user of SecureSessionMgrBase
+ *   is interested in receiving these callbacks, they can specialize this class and handle
+ *   each trigger in their implementation of this class.
+ */
+class DLL_EXPORT SecureSessionMgrCallback : public ReferenceCounted<SecureSessionMgrCallback>
 {
 public:
     /**
-     *    The State of a secure transport object.
+     * @brief
+     *   Called when a new message is received. The function must internally release the
+     *   msgBuf after processing it.
+     *
+     * @param header  messageheader
+     * @param state connection state
+     * @param msgBuf received message
      */
-    enum class State
-    {
-        kNotReady,    /**< State before initialization. */
-        kInitialized, /**< State when the object is ready connect to other peers. */
-    };
+    virtual void OnMessageReceived(const MessageHeader & header, Transport::PeerConnectionState * state,
+                                   System::PacketBuffer * msgBuf, SecureSessionMgrBase * mgr)
+    {}
 
     /**
      * @brief
-     *   Initialize a Secure Transport
+     *   Called when received message processing resulted in error
      *
-     * @param inet  Inet layer to use
-     * @param listenParams  Listen settings for the transport
-     *
-     * @note This is not a final API as it is UDP specific. Class will be updated to support
-     * separate Transports (UDP, BLE, TCP, optional ipv4 for testing etc.). This API is currently
-     * UDP-specific and that will change.
+     * @param error error code
+     * @param source network entity that sent the message
      */
-    CHIP_ERROR Init(NodeId localNodeId, Inet::InetLayer * inet, const Transport::UdpListenParameters & listenParams);
+    virtual void OnReceiveError(CHIP_ERROR error, const Transport::PeerAddress & source, SecureSessionMgrBase * mgr) {}
 
+    /**
+     * @brief
+     *   Called when a new connection is being established
+     *
+     * @param state connection state
+     */
+    virtual void OnNewConnection(Transport::PeerConnectionState * state, SecureSessionMgrBase * mgr) {}
+
+    virtual ~SecureSessionMgrCallback() {}
+};
+
+class DLL_EXPORT SecureSessionMgrBase : public ReferenceCounted<SecureSessionMgrBase>
+{
+public:
     /**
      * Establishes a connection to the given peer node.
      *
@@ -82,78 +106,59 @@ public:
      */
     CHIP_ERROR SendMessage(NodeId peerNodeId, System::PacketBuffer * msgBuf);
 
-    SecureSessionMgr();
-    virtual ~SecureSessionMgr() {}
+    SecureSessionMgrBase();
+    virtual ~SecureSessionMgrBase();
 
     /**
-     * Sets the message receive handler and associated argument
+     * @brief
+     *   Set the callback object.
      *
-     * @param[in] handler The callback to call when a message is received
-     * @param[in] param   The argument to pass in to the handler function
-     *
+     * @details
+     *   Release if there was an existing callback object
      */
-    template <class T>
-    void SetMessageReceiveHandler(void (*handler)(const MessageHeader &, Transport::PeerConnectionState *, System::PacketBuffer *,
-                                                  T *),
-                                  T * param)
+    void SetDelegate(SecureSessionMgrCallback * cb)
     {
-        mMessageReceivedArgument = param;
-        OnMessageReceived        = reinterpret_cast<MessageReceiveHandler>(handler);
+        if (mCB != nullptr)
+        {
+            mCB->Release();
+        }
+        mCB = cb->Retain();
     }
 
+protected:
     /**
-     * Sets the receive error handler and associated argument
+     * @brief
+     *   Initialize a Secure Session Manager
      *
-     * @param[in] handler The callback to call on receive error
-     *
+     * @param localNodeId    Node id for the current node
+     * @param systemLayer    System, layer to use
+     * @param transport Underlying Transport to use
      */
-    void SetReceiveErrorHandler(void (*handler)(CHIP_ERROR, const Inet::IPPacketInfo &))
-    {
-        OnReceiveError = reinterpret_cast<ReceiveErrorHandler>(handler);
-    }
-
-    /**
-     * Sets the new connection handler and associated argument
-     *
-     * @param[in] handler The callback to call when a message is received
-     * @param[in] param   The argument to pass in to the handler function
-     *
-     */
-    template <class T>
-    void SetNewConnectionHandler(void (*handler)(Transport::PeerConnectionState *, T *), T * param)
-    {
-        mNewConnectionArgument = param;
-        OnNewConnection        = reinterpret_cast<NewConnectionHandler>(handler);
-    }
+    CHIP_ERROR InitInternal(NodeId localNodeId, System::Layer * systemLayer, Transport::Base * transport);
 
 private:
-    // TODO: add support for multiple transports (TCP, BLE to be added)
-    Transport::UDP mTransport;
-
-    NodeId mLocalNodeId;                                                                //< Id of the current node
-    Transport::PeerConnections<CHIP_CONFIG_PEER_CONNECTION_POOL_SIZE> mPeerConnections; //< Active connections to other peers
-    State mState;                                                                       //< Initialization state of the object
-
     /**
-     * This function is the application callback that is invoked when a message is received over a
-     * Chip connection.
-     *
-     * @param[in]    msgBuf        A pointer to the PacketBuffer object holding the message.
+     *    The State of a secure transport object.
      */
-    typedef void (*MessageReceiveHandler)(const MessageHeader & header, Transport::PeerConnectionState * state,
-                                          System::PacketBuffer * msgBuf, void * param);
+    enum class State
+    {
+        kNotReady,    /**< State before initialization. */
+        kInitialized, /**< State when the object is ready connect to other peers. */
+    };
 
-    MessageReceiveHandler OnMessageReceived = nullptr; ///< Callback on message receiving
-    void * mMessageReceivedArgument         = nullptr; ///< Argument for callback
+    Transport::Base * mTransport = nullptr;
+    System::Layer * mSystemLayer = nullptr;
+    NodeId mLocalNodeId;                                                                // < Id of the current node
+    Transport::PeerConnections<CHIP_CONFIG_PEER_CONNECTION_POOL_SIZE> mPeerConnections; // < Active connections to other peers
+    State mState;                                                                       // < Initialization state of the object
 
-    typedef void (*ReceiveErrorHandler)(CHIP_ERROR error, const Inet::IPPacketInfo & source);
+    SecureSessionMgrCallback * mCB = nullptr;
 
-    ReceiveErrorHandler OnReceiveError = nullptr; ///< Callback on error in message receiving
+    /** Schedules a new oneshot timer for checking connection expiry. */
+    void ScheduleExpiryTimer(void);
 
-    typedef void (*NewConnectionHandler)(Transport::PeerConnectionState * state, void * param);
-
-    NewConnectionHandler OnNewConnection = nullptr; ///< Callback for new connection received
-    void * mNewConnectionArgument        = nullptr; ///< Argument for callback
+    /** Cancels any active timers for connection expiry checks. */
+    void CancelExpiryTimer(void);
 
     /**
      * Allocates a new connection for the given source.
@@ -165,13 +170,52 @@ private:
     CHIP_ERROR AllocateNewConnection(const MessageHeader & header, const Transport::PeerAddress & address,
                                      Transport::PeerConnectionState ** state);
 
+    static void HandleDataReceived(MessageHeader & header, const Transport::PeerAddress & source, System::PacketBuffer * msgBuf,
+                                   SecureSessionMgrBase * transport);
+
     /**
-     * Handle UDP data receiving. Each transport has separate data receiving as active sessions
-     * follow data receiving channels.
-     *
+     * Called when a specific connection expires.
      */
-    static void HandleUdpDataReceived(const MessageHeader & header, const Inet::IPPacketInfo & source,
-                                      System::PacketBuffer * msgBuf, SecureSessionMgr * transport);
+    static void HandleConnectionExpired(const Transport::PeerConnectionState & state, SecureSessionMgrBase * mgr);
+
+    /**
+     * Callback for timer expiry check
+     */
+    static void ExpiryTimerCallback(System::Layer * layer, void * param, System::Error error);
+};
+
+/**
+ * A secure session manager that includes required underlying transports.
+ */
+template <typename... TransportTypes>
+class SecureSessionMgr : public SecureSessionMgrBase
+{
+public:
+    /**
+     * @brief
+     *   Initialize a Secure Session Manager
+     *
+     * @param localNodeId    Node id for the current node
+     * @param systemLayer    System, layer to use
+     * @param transportInitArgs Arguments to initialize the underlying transport
+     */
+    template <typename... Args>
+    CHIP_ERROR Init(NodeId localNodeId, System::Layer * systemLayer, Args &&... transportInitArgs)
+    {
+        CHIP_ERROR err = CHIP_NO_ERROR;
+
+        err = mTransport.Init(std::forward<Args>(transportInitArgs)...);
+        SuccessOrExit(err);
+
+        err = InitInternal(localNodeId, systemLayer, &mTransport);
+        SuccessOrExit(err);
+
+    exit:
+        return err;
+    }
+
+private:
+    Transport::Tuple<TransportTypes...> mTransport;
 };
 
 } // namespace chip

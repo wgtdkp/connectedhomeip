@@ -17,7 +17,7 @@
 #   limitations under the License.
 #
 
-# 
+#
 #   @file
 #         Makefile for building the CHIP nRF52840 Lock Example Application.
 #
@@ -26,6 +26,7 @@ PROJECT_ROOT := $(realpath .)
 
 CHIP_ROOT ?= $(realpath $(PROJECT_ROOT)/third_party/connectedhomeip)
 BUILD_SUPPORT_DIR = $(CHIP_ROOT)/config/nrf5
+NRF5_PLATFORM_DIR = $(CHIP_ROOT)/examples/platform/nrf528xx
 
 include $(BUILD_SUPPORT_DIR)/nrf5-app.mk
 include $(BUILD_SUPPORT_DIR)/nrf5-chip.mk
@@ -35,9 +36,7 @@ APP = chip-nrf52840-lock-example
 SRCS = \
     $(PROJECT_ROOT)/main/main.cpp \
     $(PROJECT_ROOT)/main/AppTask.cpp \
-    $(PROJECT_ROOT)/main/LEDWidget.cpp \
     $(PROJECT_ROOT)/main/BoltLockManager.cpp \
-    $(PROJECT_ROOT)/main/Server.cpp \
     $(PROJECT_ROOT)/main/DataModelHandler.cpp \
     $(PROJECT_ROOT)/main/support/nRF5Sbrk.c \
     $(PROJECT_ROOT)/main/support/FreeRTOSNewlibLockSupport.c \
@@ -110,10 +109,15 @@ INC_DIRS = \
     $(PROJECT_ROOT)/main/traits/include \
     $(PROJECT_ROOT)/main/schema/include \
     $(PROJECT_ROOT)/third_party/printf \
+    $(CHIP_OUTPUT_DIR)/third_party/openthread/include \
     $(CHIP_ROOT)/src/include/ \
     $(CHIP_ROOT)/src/lib \
     $(CHIP_ROOT)/src/ \
     $(CHIP_ROOT)/src/system \
+    $(CHIP_ROOT)/third_party/openthread/repo/include \
+    $(NRF5_PLATFORM_DIR)/app/include \
+    $(NRF5_PLATFORM_DIR)/app/project_include \
+    $(NRF5_PLATFORM_DIR)/util/include \
     $(NRF5_SDK_ROOT)/components \
     $(NRF5_SDK_ROOT)/components/boards \
     $(NRF5_SDK_ROOT)/components/ble/ble_advertising \
@@ -188,15 +192,9 @@ DEFINES = \
     NRF52840_XXAA \
     NRFX_PRS_ENABLED=0 \
     NRF_SD_BLE_API_VERSION=7 \
-    OPENTHREAD_CONFIG_COAP_API_ENABLE \
-    OPENTHREAD_CONFIG_ENABLE_BUILTIN_MBEDTLS=0 \
-    OPENTHREAD_CONFIG_FILE=\"openthread-config-wrap.h\" \
-    OPENTHREAD_FTD=1 \
     PRINTF_DISABLE_SUPPORT_EXPONENTIAL \
     S140 \
     SOFTDEVICE_PRESENT \
-    THREAD_EXAMPLE_COAP_SERVER=1 \
-    THREAD_EXAMPLE_FREERTOS=1 \
     UART0_ENABLED=0 \
     UART1_ENABLED=1 \
     USE_APP_CONFIG \
@@ -221,15 +219,12 @@ LIBS = \
     $(NRF5_SDK_ROOT)/external/openthread/nrf_security/lib/libmbedcrypto_glue.a \
     $(NRF5_SDK_ROOT)/external/openthread/nrf_security/lib/libmbedcrypto_glue_cc310.a \
     $(NRF5_SDK_ROOT)/external/openthread/nrf_security/lib/libmbedcrypto_glue_vanilla.a \
-    $(NRF5_SDK_ROOT)/external/openthread/lib/nrf52840/gcc/libnordicsemi-nrf52840-radio-driver-softdevice.a \
     $(NRF5_SDK_ROOT)/external/openthread/nrf_security/lib/libmbedcrypto_cc310_backend.a \
     $(NRF5_SDK_ROOT)/external/openthread/nrf_security/lib/libmbedcrypto_vanilla_backend.a \
-    $(NRF5_SDK_ROOT)/external/openthread/lib/nrf52840/gcc/libopenthread-platform-utils.a \
     $(NRF5_SDK_ROOT)/external/openthread/nrf_security/lib/libmbedtls_base_vanilla.a \
     $(NRF5_SDK_ROOT)/external/openthread/nrf_security/lib/libmbedtls_tls_vanilla.a \
     $(NRF5_SDK_ROOT)/external/openthread/nrf_security/lib/libmbedtls_x509_vanilla.a \
     $(NRF5_SDK_ROOT)/external/openthread/nrf_security/lib/libnrf_cc310_platform_0.9.1.a \
-    $(NRF5_SDK_ROOT)/external/openthread/lib/nrf52840/gcc/libopenthread-ftd.a \
 
 CFLAGS = \
     --specs=nano.specs
@@ -272,8 +267,8 @@ else
     CHIP_DEFINES += CHIP_CONFIG_LOG_LEVEL=OT_LOG_LEVEL_INFO
 endif
 
-CHIP_PROJECT_CONFIG = $(PROJECT_ROOT)/main/include/CHIPProjectConfig.h
+CHIP_PROJECT_CONFIG = $(NRF5_PLATFORM_DIR)/app/project_include/CHIPProjectConfig.h
 
-LINKER_SCRIPT = $(PROJECT_ROOT)/main/ldscripts/chip-nrf52840-lock-example.ld
+LINKER_SCRIPT = $(NRF5_PLATFORM_DIR)/app/ldscripts/chip-nrf52840-example.ld
 
 $(call GenerateBuildRules)

@@ -58,7 +58,8 @@ ConnectivityManager::WiFiStationMode ConnectivityManagerImpl::_GetWiFiStationMod
     if (mWiFiStationMode != kWiFiStationMode_ApplicationControlled)
     {
         wifi_mode_t curWiFiMode;
-        mWiFiStationMode = (esp_wifi_get_mode(&curWiFiMode) == ESP_OK && curWiFiMode == WIFI_MODE_APSTA)
+        mWiFiStationMode =
+            (esp_wifi_get_mode(&curWiFiMode) == ESP_OK && (curWiFiMode == WIFI_MODE_APSTA || curWiFiMode == WIFI_MODE_STA))
             ? kWiFiStationMode_Enabled
             : kWiFiStationMode_Disabled;
     }
@@ -907,16 +908,11 @@ CHIP_ERROR ConnectivityManagerImpl::ConfigureWiFiAP()
 
     memset(&wifiConfig, 0, sizeof(wifiConfig));
 
-    // TODO Pull this from the configuration manager
-    uint8_t mac[6];
-    err = esp_wifi_get_mac(ESP_IF_WIFI_STA, mac);
-    if (err != ESP_OK)
-    {
-        ChipLogError(DeviceLayer, "esp_wifi_get_mac(ESP_IF_WIFI_STA) failed: %s", chip::ErrorStr(err));
-    }
-    SuccessOrExit(err);
+    uint32_t discriminator;
+    SuccessOrExit(err = ConfigurationMgr().GetSetupDiscriminator(discriminator));
 
-    snprintf((char *) wifiConfig.ap.ssid, sizeof(wifiConfig.ap.ssid), "%s%02X%02X", "CHIP_DEMO-", mac[4], mac[5]);
+    snprintf((char *) wifiConfig.ap.ssid, sizeof(wifiConfig.ap.ssid), "%s%04u", CHIP_DEVICE_CONFIG_WIFI_AP_SSID_PREFIX,
+             discriminator);
     wifiConfig.ap.channel         = CHIP_DEVICE_CONFIG_WIFI_AP_CHANNEL;
     wifiConfig.ap.authmode        = WIFI_AUTH_OPEN;
     wifiConfig.ap.max_connection  = CHIP_DEVICE_CONFIG_WIFI_AP_MAX_STATIONS;

@@ -23,6 +23,7 @@
 
 NS_ASSUME_NONNULL_BEGIN
 
+typedef void (^ControllerOnConnectedBlock)(void);
 typedef void (^ControllerOnMessageBlock)(NSData * message);
 typedef void (^ControllerOnErrorBlock)(NSError * error);
 
@@ -39,13 +40,25 @@ typedef void (^ControllerOnErrorBlock)(NSError * error);
       local_key:(NSData *)local_key
        peer_key:(NSData *)peer_key
           error:(NSError * __autoreleasing *)error;
+- (BOOL)connect:(uint16_t)discriminator setupPINCode:(uint32_t)setupPINCode error:(NSError * __autoreleasing *)error;
 - (nullable AddressInfo *)getAddressInfo;
 - (BOOL)sendMessage:(NSData *)message error:(NSError * __autoreleasing *)error;
-// We can't include definitions of ChipZclClusterId_t and ChipZclCommandId_t
-// here, but they're just integers, so pass them that way.
-- (BOOL)sendCHIPCommand:(uint16_t)cluster command:(uint16_t)command;
+- (BOOL)sendOnCommand;
+- (BOOL)sendOffCommand;
+- (BOOL)sendToggleCommand;
 - (BOOL)disconnect:(NSError * __autoreleasing *)error;
 - (BOOL)isConnected;
+
+/**
+ * Test whether a given message is likely to be a data model command.
+ */
++ (BOOL)isDataModelCommand:(NSData * _Nonnull)message;
+
+/**
+ * Given a data model command, convert it to some sort of human-readable
+ * string that describes what it is, as far as we can tell.
+ */
++ (NSString *)commandToString:(NSData * _Nonnull)command;
 
 - (instancetype)init NS_UNAVAILABLE;
 + (instancetype)new NS_UNAVAILABLE;
@@ -67,6 +80,7 @@ typedef void (^ControllerOnErrorBlock)(NSError * error);
  * @param[in] onError the block to call when there is a network error.
  */
 - (void)registerCallbacks:(dispatch_queue_t)appCallbackQueue
+              onConnected:(ControllerOnConnectedBlock)onConnected
                 onMessage:(ControllerOnMessageBlock)onMessage
                   onError:(ControllerOnErrorBlock)onError;
 

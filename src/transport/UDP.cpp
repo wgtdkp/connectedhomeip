@@ -45,7 +45,7 @@ UDP::~UDP()
     }
 }
 
-CHIP_ERROR UDP::Init(Inet::InetLayer * inetLayer, const UdpListenParameters & params)
+CHIP_ERROR UDP::Init(UdpListenParameters & params)
 {
     CHIP_ERROR err = CHIP_NO_ERROR;
 
@@ -53,7 +53,7 @@ CHIP_ERROR UDP::Init(Inet::InetLayer * inetLayer, const UdpListenParameters & pa
 
     mSendPort = params.GetMessageSendPort();
 
-    err = inetLayer->NewUDPEndPoint(&mUDPEndPoint);
+    err = params.GetInetLayer()->NewUDPEndPoint(&mUDPEndPoint);
     SuccessOrExit(err);
 
     err = mUDPEndPoint->Bind(params.GetAddressType(), IPAddress::Any, params.GetListenPort(), params.GetInterfaceId());
@@ -64,6 +64,7 @@ CHIP_ERROR UDP::Init(Inet::InetLayer * inetLayer, const UdpListenParameters & pa
 
     mUDPEndPoint->AppState          = reinterpret_cast<void *>(this);
     mUDPEndPoint->OnMessageReceived = OnUdpReceive;
+    mUDPEndpointType                = params.GetAddressType();
 
     mState = State::kInitialized;
 
@@ -122,16 +123,17 @@ exit:
 
 void UDP::OnUdpReceive(Inet::IPEndPointBasis * endPoint, System::PacketBuffer * buffer, const IPPacketInfo * pktInfo)
 {
-    CHIP_ERROR err    = CHIP_NO_ERROR;
-    UDP * udp         = reinterpret_cast<UDP *>(endPoint->AppState);
-    size_t headerSize = 0;
+    CHIP_ERROR err          = CHIP_NO_ERROR;
+    UDP * udp               = reinterpret_cast<UDP *>(endPoint->AppState);
+    size_t headerSize       = 0;
+    PeerAddress peerAddress = PeerAddress::UDP(pktInfo->SrcAddress, pktInfo->SrcPort);
 
     MessageHeader header;
     err = header.Decode(buffer->Start(), buffer->DataLength(), &headerSize);
     SuccessOrExit(err);
 
     buffer->ConsumeHead(headerSize);
-    udp->HandleMessageReceived(header, *pktInfo, buffer);
+    udp->HandleMessageReceived(header, peerAddress, buffer);
 
 exit:
     if (err != CHIP_NO_ERROR)

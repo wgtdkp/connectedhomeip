@@ -49,22 +49,9 @@ extern "C" {
 #include "nrf_log_default_backends.h"
 #endif // NRF_LOG_ENABLED
 
+#include "chipinit.h"
 #include <AppTask.h>
-#if CHIP_ENABLE_OPENTHREAD
-#include <mbedtls/platform.h>
-#include <openthread/cli.h>
-#include <openthread/dataset.h>
-#include <openthread/error.h>
-#include <openthread/heap.h>
-#include <openthread/icmp6.h>
-#include <openthread/instance.h>
-#include <openthread/link.h>
-#include <openthread/platform/openthread-system.h>
-#include <openthread/tasklet.h>
-#include <openthread/thread.h>
 #include <platform/CHIPDeviceLayer.h>
-#include <support/logging/CHIPLogging.h>
-#endif // CHIP_ENABLE_OPENTHREAD
 
 using namespace ::chip;
 using namespace ::chip::Inet;
@@ -290,10 +277,9 @@ int main(void)
     ret = ThreadStackMgrImpl().StartThreadTask();
     if (ret != CHIP_NO_ERROR)
     {
-        NRF_LOG_INFO("ThreadStackMgr().StartThreadTask() failed");
+        NRF_LOG_INFO("ChipInit() failed");
         APP_ERROR_HANDLER(ret);
     }
-#endif // CHIP_ENABLE_OPENTHREAD
 
     ret = GetAppTask().StartAppTask();
     if (ret != NRF_SUCCESS)

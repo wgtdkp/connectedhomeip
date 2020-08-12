@@ -109,7 +109,7 @@ CHIP_CONFIGURE_OPTIONS = \
     --with-chip-ble-project-includes=$(CHIP_PROJECT_CONFIG) \
     --with-chip-warm-project-includes=$(CHIP_PROJECT_CONFIG) \
     --with-chip-device-project-includes=$(CHIP_PROJECT_CONFIG) \
-    --with-openthread=$(NRF5_SDK_ROOT)/external/openthread \
+    --with-openthread=internal \
     --disable-ipv4 \
     --disable-tests \
     --disable-tools \
@@ -149,6 +149,7 @@ STD_LDFLAGS += -L$(CHIP_OUTPUT_DIR)/lib
 STD_LIBS += \
     -lDeviceLayer \
     -lCHIP \
+    -lCHIPDataModel \
     -lInetLayer \
     -lSystemLayer \
     -llwip \
@@ -204,11 +205,11 @@ config-chip : $(CHIP_OUTPUT_DIR)/config.status | $(OPENTHREAD_PREREQUISITE)
 
 build-chip : config-chip
 	@echo "$(HDR_PREFIX)BUILD CHIP..."
-	$(NO_ECHO)MAKEFLAGS= make -C $(CHIP_OUTPUT_DIR) --no-print-directory all V=$(VERBOSE)
+	$(NO_ECHO) $(MAKE) -C $(CHIP_OUTPUT_DIR) --no-print-directory all V=$(VERBOSE)
 
 install-chip : | build-chip
 	@echo "$(HDR_PREFIX)INSTALL CHIP..."
-	$(NO_ECHO)MAKEFLAGS= make -C $(CHIP_OUTPUT_DIR) --no-print-directory install V=$(VERBOSE)
+	$(NO_ECHO) $(MAKE) -C $(CHIP_OUTPUT_DIR) --no-print-directory install V=$(VERBOSE)
 
 clean-chip:
 	@echo "$(HDR_PREFIX)RM $(CHIP_OUTPUT_DIR)"
@@ -220,6 +221,7 @@ $(CHIP_OUTPUT_DIR) :
 
 endef
 
+$(STD_LINK_PREREQUISITES): build-chip
 
 # ==================================================
 # CHIP-specific help definitions

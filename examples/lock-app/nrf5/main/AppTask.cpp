@@ -76,7 +76,6 @@ static bool sHaveServiceConnectivity = false;
 using namespace ::chip::DeviceLayer;
 
 AppTask AppTask::sAppTask;
-chip::SecureSessionMgr sTransportIPv6;
 
 int AppTask::StartAppTask()
 {
@@ -446,7 +445,7 @@ void AppTask::FunctionTimerEventHandler(AppEvent * aEvent)
     {
         // Actually trigger Factory Reset
         sAppTask.mFunction = kFunction_NoneSelected;
-        ThreadStackMgr().FactoryReset();
+        ConfigurationMgr().InitiateFactoryReset();
     }
 }
 

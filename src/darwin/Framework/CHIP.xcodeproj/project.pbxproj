@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		1E3DE6E124AF86F50028DC40 /* libDeviceLayer.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 1E3DE6E024AF86F50028DC40 /* libDeviceLayer.a */; };
 		2C4DF09E248B2C60009307CB /* libmbedtls.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 2C4DF09D248B2C60009307CB /* libmbedtls.a */; };
 		515C401C2486BF43004C4DB3 /* CHIPOnOff.mm in Sources */ = {isa = PBXBuildFile; fileRef = 515C401A2486BF43004C4DB3 /* CHIPOnOff.mm */; };
 		515C401D2486BF43004C4DB3 /* CHIPOnOff.h in Headers */ = {isa = PBXBuildFile; fileRef = 515C401B2486BF43004C4DB3 /* CHIPOnOff.h */; settings = {ATTRIBUTES = (Public, ); }; };
@@ -41,6 +42,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		1E3DE6E024AF86F50028DC40 /* libDeviceLayer.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libDeviceLayer.a; path = lib/libDeviceLayer.a; sourceTree = BUILD_PRODUCT_DIR; };
 		2C4DF09D248B2C60009307CB /* libmbedtls.a */ = {isa = PBXFileReference; lastKnownFileType = archive.ar; name = libmbedtls.a; path = lib/libmbedtls.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		515C401A2486BF43004C4DB3 /* CHIPOnOff.mm */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.objcpp; path = CHIPOnOff.mm; sourceTree = "<group>"; };
 		515C401B2486BF43004C4DB3 /* CHIPOnOff.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = CHIPOnOff.h; sourceTree = "<group>"; };
@@ -72,6 +74,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				1E3DE6E124AF86F50028DC40 /* libDeviceLayer.a in Frameworks */,
 				BA09EB43247477BA00605257 /* libCHIP.a in Frameworks */,
 				2C4DF09E248B2C60009307CB /* libmbedtls.a in Frameworks */,
 				BA09EB44247477BC00605257 /* libSetupPayload.a in Frameworks */,
@@ -147,6 +150,7 @@
 				2C4DF09D248B2C60009307CB /* libmbedtls.a */,
 				BA09EB3F2474762900605257 /* libCHIP.a */,
 				BA09EB402474762900605257 /* libSetupPayload.a */,
+				1E3DE6E024AF86F50028DC40 /* libDeviceLayer.a */,
 			);
 			name = Frameworks;
 			sourceTree = "<group>";
@@ -176,7 +180,7 @@
 			isa = PBXNativeTarget;
 			buildConfigurationList = B20252A12459E34F00F97062 /* Build configuration list for PBXNativeTarget "CHIP" */;
 			buildPhases = (
-				0C40A67D246C9AC700885C81 /* ShellScript */,
+				0C40A67D246C9AC700885C81 /* Run Script */,
 				B20252882459E34F00F97062 /* Headers */,
 				B20252892459E34F00F97062 /* Sources */,
 				B202528A2459E34F00F97062 /* Frameworks */,
@@ -265,7 +269,7 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXShellScriptBuildPhase section */
-		0C40A67D246C9AC700885C81 /* ShellScript */ = {
+		0C40A67D246C9AC700885C81 /* Run Script */ = {
 			isa = PBXShellScriptBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -274,6 +278,7 @@
 			);
 			inputPaths = (
 			);
+			name = "Run Script";
 			outputFileListPaths = (
 			);
 			outputPaths = (
@@ -458,6 +463,13 @@
 				LIBRARY_SEARCH_PATHS = "$(CHIP_PREFIX)/lib";
 				ONLY_ACTIVE_ARCH = NO;
 				OTHER_LDFLAGS = "";
+				"OTHER_LDFLAGS[arch=*]" = (
+					"-framework",
+					Foundation,
+					"-framework",
+					CoreBluetooth,
+					"-lnetwork",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.chip.CHIP;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
@@ -488,6 +500,13 @@
 				LIBRARY_SEARCH_PATHS = "$(CHIP_PREFIX)/lib";
 				ONLY_ACTIVE_ARCH = NO;
 				OTHER_LDFLAGS = "";
+				"OTHER_LDFLAGS[arch=*]" = (
+					"-lnetwork",
+					"-framework",
+					Foundation,
+					"-framework",
+					CoreBluetooth,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.chip.CHIP;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
@@ -616,6 +635,13 @@
 				LIBRARY_SEARCH_PATHS = "$(CHIP_PREFIX)/lib";
 				ONLY_ACTIVE_ARCH = NO;
 				OTHER_LDFLAGS = "";
+				"OTHER_LDFLAGS[sdk=*]" = (
+					"-framework",
+					Foundation,
+					"-framework",
+					CoreBluetooth,
+					"-lnetwork",
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.chip.CHIP;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;
@@ -723,6 +749,13 @@
 				LIBRARY_SEARCH_PATHS = "$(CHIP_PREFIX)/lib";
 				ONLY_ACTIVE_ARCH = NO;
 				OTHER_LDFLAGS = "";
+				"OTHER_LDFLAGS[arch=*]" = (
+					"-lnetwork",
+					"-framework",
+					Foundation,
+					"-framework",
+					CoreBluetooth,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.chip.CHIP;
 				PRODUCT_NAME = "$(TARGET_NAME:c99extidentifier)";
 				SKIP_INSTALL = YES;

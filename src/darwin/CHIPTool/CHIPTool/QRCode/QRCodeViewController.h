@@ -15,10 +15,10 @@
  *    limitations under the License.
  */
 
+#import "CHIPViewControllerBase.h"
 #import <AVFoundation/AVFoundation.h>
-#import <UIKit/UIKit.h>
 
-@interface QRCodeViewController : UIViewController <AVCaptureMetadataOutputObjectsDelegate>
+@interface QRCodeViewController : CHIPViewControllerBase <AVCaptureMetadataOutputObjectsDelegate>
 
 @property (weak, nonatomic) IBOutlet UIView * qrCodeViewPreview;
 @property (weak, nonatomic) IBOutlet UITextField * manualCodeTextField;

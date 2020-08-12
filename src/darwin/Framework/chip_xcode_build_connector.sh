@@ -1,5 +1,22 @@
 #!/usr/bin/env bash
 
+#
+#    Copyright (c) 2020 Project CHIP Authors
+#    All rights reserved.
+#
+#    Licensed under the Apache License, Version 2.0 (the "License");
+#    you may not use this file except in compliance with the License.
+#    You may obtain a copy of the License at
+#
+#        http://www.apache.org/licenses/LICENSE-2.0
+#
+#    Unless required by applicable law or agreed to in writing, software
+#    distributed under the License is distributed on an "AS IS" BASIS,
+#    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#    See the License for the specific language governing permissions and
+#    limitations under the License.
+#
+
 here=$(cd "${0%/*}" && pwd)
 me=${0##*/}
 
@@ -72,6 +89,7 @@ configure_OPTIONS+=(
     --disable-shared
     --disable-tests
     --disable-tools
+    --with-device-layer=darwin
     --with-logging-style=external
     --with-chip-system-project-includes=no
     --with-chip-inet-project-includes=no
@@ -87,16 +105,17 @@ configure_OPTIONS+=(
     if [[ ! -x config.status || ${here}/${me} -nt config.status ]]; then
         "$CHIP_ROOT"/bootstrap-configure -C "${configure_OPTIONS[@]}"
     else
-        for makefile_am in "$(find "$CHIP_ROOT" -name Makefile.am)"; do
+        while IFS= read -r -d '' makefile_am; do
             [[ ${makefile_am} -ot ${makefile_am/.am/.in} ]] || {
                 "$CHIP_ROOT"/bootstrap -w make
                 break
             }
-        done
+        done < <(find "$CHIP_ROOT" -name Makefile.am)
     fi
 
     make V=1 install-data                   # all the headers
     make V=1 -C src/lib install             # libCHIP.a
+    make V=1 -C src/platform install        # libDeviceLayer.a
     make V=1 -C src/setup_payload install   # libSetupPayload.a
     make V=1 -C third_party/mbedtls install # libmbedtls.a
 )

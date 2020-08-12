@@ -34,8 +34,11 @@ class ConfigurationManagerImpl;
 namespace Internal {
 class DeviceNetworkInfo;
 class DeviceControlServer;
+class BLEManagerImpl;
 template <class>
 class GenericPlatformManagerImpl;
+template <class>
+class GenericConfigurationManagerImpl;
 template <class>
 class GenericPlatformManagerImpl_FreeRTOS;
 template <class>
@@ -67,7 +70,7 @@ public:
     void LockThreadStack(void);
     bool TryLockThreadStack(void);
     void UnlockThreadStack(void);
-    bool HaveRouteToAddress(const IPAddress & destAddr);
+    bool HaveRouteToAddress(const Inet::IPAddress & destAddr);
     CHIP_ERROR GetAndLogThreadStatsCounters(void);
     CHIP_ERROR GetAndLogThreadTopologyMinimal(void);
     CHIP_ERROR GetAndLogThreadTopologyFull(void);
@@ -81,7 +84,9 @@ private:
 
     friend class PlatformManagerImpl;
     friend class ConfigurationManagerImpl;
+#if CHIP_DEVICE_CONFIG_ENABLE_CHIPOBLE
     friend class Internal::BLEManagerImpl;
+#endif
     friend class Internal::DeviceControlServer;
     template <class>
     friend class Internal::GenericPlatformManagerImpl;
@@ -107,7 +112,7 @@ private:
     bool IsThreadAttached(void);
     CHIP_ERROR GetThreadProvision(Internal::DeviceNetworkInfo & netInfo, bool includeCredentials);
     CHIP_ERROR SetThreadProvision(const Internal::DeviceNetworkInfo & netInfo);
-    void ClearThreadProvision(void);
+    void ErasePersistentInfo(void);
     ConnectivityManager::ThreadDeviceType GetThreadDeviceType(void);
     CHIP_ERROR SetThreadDeviceType(ConnectivityManager::ThreadDeviceType threadRole);
     void GetThreadPollingConfig(ConnectivityManager::ThreadPollingConfig & pollingConfig);
@@ -233,9 +238,9 @@ inline CHIP_ERROR ThreadStackManager::SetThreadProvision(const Internal::DeviceN
     return static_cast<ImplClass *>(this)->_SetThreadProvision(netInfo);
 }
 
-inline void ThreadStackManager::ClearThreadProvision(void)
+inline void ThreadStackManager::ErasePersistentInfo(void)
 {
-    static_cast<ImplClass *>(this)->_ClearThreadProvision();
+    static_cast<ImplClass *>(this)->_ErasePersistentInfo();
 }
 
 inline ConnectivityManager::ThreadDeviceType ThreadStackManager::GetThreadDeviceType(void)
@@ -298,9 +303,9 @@ inline CHIP_ERROR ThreadStackManager::GetPrimary802154MACAddress(uint8_t * buf)
     return static_cast<ImplClass *>(this)->_GetPrimary802154MACAddress(buf);
 }
 
-inline void ThreadStackManager::FactoryReset()
+inline CHIP_ERROR ThreadStackManager::JoinerStart(void)
 {
-    return static_cast<ImplClass *>(this)->_FactoryReset();
+    return static_cast<ImplClass *>(this)->_JoinerStart();
 }
 
 inline void ThreadStackManager::JoinerStart()

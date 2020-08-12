@@ -64,7 +64,7 @@ protected:
     CHIP_ERROR _SetThreadPollingConfig(const ConnectivityManager::ThreadPollingConfig & pollingConfig);
     bool _IsThreadAttached(void);
     bool _IsThreadProvisioned(void);
-    void _ClearThreadProvision(void);
+    void _ErasePersistentInfo(void);
     bool _HaveServiceConnectivityViaThread(void);
 
     // ===== Members for use by the implementation subclass.
@@ -84,9 +84,6 @@ private:
 
     ImplClass * Impl() { return static_cast<ImplClass *>(this); }
 };
-
-// Instruct the compiler to instantiate the template only when explicitly told to do so.
-extern template class GenericConnectivityManagerImpl_Thread<ConnectivityManagerImpl>;
 
 template <class ImplClass>
 inline void GenericConnectivityManagerImpl_Thread<ImplClass>::_Init(void)
@@ -119,9 +116,9 @@ inline bool GenericConnectivityManagerImpl_Thread<ImplClass>::_IsThreadProvision
 }
 
 template <class ImplClass>
-inline void GenericConnectivityManagerImpl_Thread<ImplClass>::_ClearThreadProvision(void)
+inline void GenericConnectivityManagerImpl_Thread<ImplClass>::_ErasePersistentInfo(void)
 {
-    ThreadStackMgrImpl().ClearThreadProvision();
+    ThreadStackMgrImpl().ErasePersistentInfo();
 }
 
 template <class ImplClass>

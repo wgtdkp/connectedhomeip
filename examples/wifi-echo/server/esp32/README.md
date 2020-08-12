@@ -49,10 +49,10 @@ step. To install these components manually, follow these steps:
 Currently building in VSCode _and_ deploying from native is not supported, so
 make sure the IDF_PATH has been exported(See the manual setup steps above).
 
--   In the root of the example directory, sync the dependencies and source
-    `idf.sh`. Note: This does not have to be repeated for incremental builds.
+-   In the root of the example directory, sync the CHIP tree's submodules and
+    source `idf.sh`. Note: This does not have to be repeated for incremental
+    builds.
 
-          $ make -C third_party/connectedhomeip -f Makefile-bootstrap repos
           $ source idf.sh
 
 -   Next, if you want to use the M5Stack with its display and show a QRCode run
@@ -141,8 +141,8 @@ Alternatively, you can connect to the ESP32's Soft-AP directly.
 
 1.  After the application has been flashed, connect to the ESP32's Soft-AP. If
     you use the M5Stack, the Soft-AP's SSID is encoded in the TLV section of the
-    QRCode on screen. It's usually something like `CHIP_DEMO-XXXX` where the
-    last 4 digits are from the device's MAC address.
+    QRCode on screen. It's usually something like `CHIP-XXX` where the last 3
+    digits are from the setup payload discriminator.
 
 2.  Once you're connected, the server's IP can be found at the gateway address.
 

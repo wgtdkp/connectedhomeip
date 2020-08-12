@@ -52,8 +52,7 @@ public:
      *
      */
     template <class T>
-    void SetMessageReceiveHandler(void (*handler)(const MessageHeader &, const Inet::IPPacketInfo &, System::PacketBuffer *, T *),
-                                  T * param)
+    void SetMessageReceiveHandler(void (*handler)(MessageHeader &, const PeerAddress &, System::PacketBuffer *, T *), T * param)
     {
         mMessageReceivedArgument = param;
         OnMessageReceived        = reinterpret_cast<MessageReceiveHandler>(handler);
@@ -66,22 +65,21 @@ public:
      *   This method calls <tt>chip::System::PacketBuffer::Free</tt> on
      *   behalf of the caller regardless of the return status.
      */
-    virtual CHIP_ERROR SendMessage(const MessageHeader & header, const Transport::PeerAddress & address,
-                                   System::PacketBuffer * msgBuf) = 0;
+    virtual CHIP_ERROR SendMessage(const MessageHeader & header, const PeerAddress & address, System::PacketBuffer * msgBuf) = 0;
 
     /**
-     * Get the path that this transport is associated with.
+     * Determine if this transport can SendMessage to the specified peer address.
      *
-     * Within a system, only one transport should be associated with a path.
+     * Generally it is expected that a transport can send to any peer from which it receives a message.
      */
-    virtual Type GetType() = 0;
+    virtual bool CanSendToPeer(const Transport::PeerAddress & address) = 0;
 
 protected:
     /**
      * Method used by subclasses to notify that a packet has been received after
      * any associated headers have been decoded.
      */
-    void HandleMessageReceived(const MessageHeader & header, const Inet::IPPacketInfo & source, System::PacketBuffer * buffer)
+    void HandleMessageReceived(const MessageHeader & header, const PeerAddress & source, System::PacketBuffer * buffer)
     {
         if (OnMessageReceived)
         {
@@ -95,13 +93,11 @@ protected:
      *
      * @param[in]    msgBuf        A pointer to the PacketBuffer object holding the message.
      */
-    typedef void (*MessageReceiveHandler)(const MessageHeader & header, const Inet::IPPacketInfo & source,
-                                          System::PacketBuffer * msgBuf, void * param);
+    typedef void (*MessageReceiveHandler)(const MessageHeader & header, const PeerAddress & source, System::PacketBuffer * msgBuf,
+                                          void * param);
 
     MessageReceiveHandler OnMessageReceived = nullptr; ///< Callback on message receiving
     void * mMessageReceivedArgument         = nullptr; ///< Argument for callback
-
-    uint8_t mRefCount = 0;
 };
 
 } // namespace Transport

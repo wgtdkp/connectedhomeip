@@ -288,7 +288,7 @@ err_t GenericThreadStackManagerImpl_OpenThread_LwIP<ImplClass>::DoInitThreadNetI
     netif->output = NULL;
 #endif /* LWIP_IPV4 || LWIP_VERSION_MAJOR < 2 */
     netif->linkoutput = NULL;
-    netif->flags      = NETIF_FLAG_UP | NETIF_FLAG_LINK_UP | NETIF_FLAG_BROADCAST | NETIF_FLAG_MLD6;
+    netif->flags      = NETIF_FLAG_UP | NETIF_FLAG_LINK_UP | NETIF_FLAG_BROADCAST;
     netif->mtu        = CHIP_DEVICE_CONFIG_THREAD_IF_MTU;
     return ERR_OK;
 }
@@ -387,7 +387,7 @@ void GenericThreadStackManagerImpl_OpenThread_LwIP<ImplClass>::ReceivePacket(otM
     struct netif * threadNetIf = ThreadStackMgrImpl().ThreadNetIf();
 
     // Allocate an LwIP pbuf to hold the inbound packet.
-    pbuf = pbuf_alloc(PBUF_RAW, pktLen, PBUF_POOL);
+    pbuf = pbuf_alloc(PBUF_LINK, pktLen, PBUF_POOL);
     VerifyOrExit(pbuf != NULL, lwipErr = ERR_MEM);
 
     // Copy the packet data from the OpenThread message object to the pbuf.

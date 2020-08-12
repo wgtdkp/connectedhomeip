@@ -32,6 +32,7 @@
 #include <core/CHIPCore.h>
 #include <core/CHIPTLV.h>
 #include <support/DLLUtil.h>
+#include <transport/BLE.h>
 #include <transport/SecureSessionMgr.h>
 #include <transport/UDP.h>
 
@@ -49,17 +50,43 @@ typedef void (*ErrorHandler)(ChipDeviceController * deviceController, void * app
 typedef void (*MessageReceiveHandler)(ChipDeviceController * deviceController, void * appReqState, System::PacketBuffer * payload);
 };
 
-class DLL_EXPORT ChipDeviceController
+class DLL_EXPORT ChipDeviceController : public SecureSessionMgrCallback
 {
+    friend class ChipDeviceControllerCallback;
+
 public:
     ChipDeviceController();
 
     void * AppState;
 
+    /**
+     * Init function to be used when there exists a device layer that takes care of initializing
+     * System::Layer and InetLayer.
+     */
     CHIP_ERROR Init(NodeId localDeviceId);
+    /**
+     * Init function to be used when already-initialized System::Layer and InetLayer are available.
+     */
+    CHIP_ERROR Init(NodeId localDeviceId, System::Layer * systemLayer, InetLayer * inetLayer);
     CHIP_ERROR Shutdown();
 
     // ----- Connection Management -----
+    /**
+     * @brief
+     *   Connect to a CHIP device with a given name for Rendezvous
+     *
+     * @param[in] remoteDeviceId        The remote device Id.
+     * @param[in] discriminator         The discriminator of the requested Device
+     * @param[in] setupPINCode          The setup PIN code of the requested Device
+     * @param[in] appReqState           Application specific context to be passed back when a message is received or on error
+     * @param[in] onConnected           Callback for when the connection is established
+     * @param[in] onMessageReceived     Callback for when a message is received
+     * @param[in] onError               Callback for when an error occurs
+     * @return CHIP_ERROR               The connection status
+     */
+    CHIP_ERROR ConnectDevice(NodeId remoteDeviceId, const uint16_t discriminator, const uint32_t setupPINCode, void * appReqState,
+                             NewConnectionHandler onConnected, MessageReceiveHandler onMessageReceived, ErrorHandler onError);
+
     /**
      * @brief
      *   Connect to a CHIP device at a given address and an optional port
@@ -97,7 +124,7 @@ public:
      * @brief
      *   Get the PeerAddress of a connected peer
      *
-     * @param[inout] peerAddress  The PeerAddress object which will be populated with the details of the connected peer
+     * @param[in,out] peerAddress  The PeerAddress object which will be populated with the details of the connected peer
      * @return CHIP_ERROR   An error if there's no active connection
      */
     CHIP_ERROR PopulatePeerAddress(Transport::PeerAddress & peerAddress);
@@ -140,23 +167,29 @@ public:
     // ----- IO -----
     /**
      * @brief
-     *   Allow the CHIP Stack to process any pending events
-     *   This can be called in an event handler loop to tigger callbacks within the CHIP stack
-     *   Note - Some platforms might need to implement their own event handler
+     * Start the event loop task within the CHIP stack
+     * @return CHIP_ERROR   The return status
      */
-    void ServiceEvents();
+    CHIP_ERROR ServiceEvents();
 
     /**
      * @brief
-     *   Get pointers to the Layers ownerd by the controller
-     *
-     * @param systemLayer[out]   A pointer to the SystemLayer object
-     * @param inetLayer[out]     A pointer to the InetLayer object
-     * @return CHIP_ERROR   Indicates whether the layers were populated correctly
+     *   Allow the CHIP Stack to process any pending events
+     *   This can be called in an event handler loop to tigger callbacks within the CHIP stack
+     * @return CHIP_ERROR   The return status
      */
-    CHIP_ERROR GetLayers(Layer ** systemLayer, InetLayer ** inetLayer);
+    CHIP_ERROR ServiceEventSignal();
+
+    virtual void OnMessageReceived(const MessageHeader & header, Transport::PeerConnectionState * state,
+                                   System::PacketBuffer * msgBuf, SecureSessionMgrBase * mgr);
+
+    virtual void OnNewConnection(Transport::PeerConnectionState * state, SecureSessionMgrBase * mgr);
 
 private:
+#if CONFIG_NETWORK_LAYER_BLE
+    friend class Transport::BLE;
+#endif
+
     enum
     {
         kState_NotInitialized = 0,
@@ -173,10 +206,8 @@ private:
     System::Layer * mSystemLayer;
     Inet::InetLayer * mInetLayer;
 
-    // TODO: CHIPDeviceController assumes a single device connection, where as
-    //       session manager handles multiple connections. Need to finalize design on this
-    //       as otherwise a single connection may end up processing data from other peers.
-    SecureSessionMgr * mSessionManager;
+    SecureSessionMgr<Transport::UDP> * mSessionManager;
+    Transport::Base * mUnsecuredTransport = NULL;
 
     ConnectionState mConState;
     void * mAppReqState;
@@ -199,11 +230,6 @@ private:
 
     void ClearRequestState();
     void ClearOpState();
-
-    static void OnNewConnection(Transport::PeerConnectionState * state, ChipDeviceController * controller);
-
-    static void OnReceiveMessage(const MessageHeader & header, Transport::PeerConnectionState * state,
-                                 System::PacketBuffer * msgBuf, ChipDeviceController * controller);
 };
 
 } // namespace DeviceController

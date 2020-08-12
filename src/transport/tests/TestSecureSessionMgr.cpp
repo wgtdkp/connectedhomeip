@@ -23,6 +23,8 @@
 
 #include "TestTransportLayer.h"
 
+#include "NetworkTestHelpers.h"
+
 #include <core/CHIPCore.h>
 #include <support/CodeUtils.h>
 #include <transport/SecureSessionMgr.h>
@@ -32,19 +34,14 @@
 
 #include <errno.h>
 
+namespace {
+
 using namespace chip;
+using namespace chip::Transport;
 
-static int Initialize(void * aContext);
-static int Finalize(void * aContext);
+using TestContext = chip::Test::IOContext;
 
-struct TestContext
-{
-    nlTestSuite * mSuite;
-    System::Layer mSystemLayer;
-    InetLayer mInetLayer;
-};
-
-struct TestContext sContext;
+TestContext sContext;
 
 static const unsigned char local_private_key[] = { 0x00, 0xd1, 0x90, 0xd9, 0xb3, 0x95, 0x1c, 0x5f, 0xa4, 0xe7, 0x47,
                                                    0x92, 0x5b, 0x0a, 0xa9, 0xa7, 0xc1, 0x1c, 0xe7, 0x06, 0x10, 0xe2,
@@ -60,99 +57,67 @@ static const char PAYLOAD[]         = "Hello!";
 constexpr NodeId kSourceNodeId      = 123654;
 constexpr NodeId kDestinationNodeId = 111222333;
 
-int ReceiveHandlerCallCount = 0;
-
-static void MessageReceiveHandler(const MessageHeader & header, Transport::PeerConnectionState * state,
-                                  System::PacketBuffer * msgBuf, nlTestSuite * inSuite)
+class LoopbackTransport : public Transport::Base
 {
-    NL_TEST_ASSERT(inSuite, header.GetSourceNodeId() == Optional<NodeId>::Value(kSourceNodeId));
-    NL_TEST_ASSERT(inSuite, header.GetDestinationNodeId() == Optional<NodeId>::Value(kDestinationNodeId));
-    NL_TEST_ASSERT(inSuite, state->GetPeerNodeId() == kDestinationNodeId);
+public:
+    /// Transports are required to have a constructor that takes exactly one argument
+    CHIP_ERROR Init(const char * unused) { return CHIP_NO_ERROR; }
 
-    size_t data_len = msgBuf->DataLength();
-
-    int compare = memcmp(msgBuf->Start(), PAYLOAD, data_len);
-    NL_TEST_ASSERT(inSuite, compare == 0);
-
-    ReceiveHandlerCallCount++;
-}
-
-int NewConnectionHandlerCallCount = 0;
-static void NewConnectionHandler(Transport::PeerConnectionState * state, nlTestSuite * inSuite)
-{
-    CHIP_ERROR err;
-
-    NewConnectionHandlerCallCount++;
-
-    err = state->GetSecureSession().TemporaryManualKeyExchange(remote_public_key, sizeof(remote_public_key), local_private_key,
-                                                               sizeof(local_private_key));
-    NL_TEST_ASSERT(inSuite, err == CHIP_NO_ERROR);
-}
-
-static void DriveIO(TestContext & ctx)
-{
-#if CHIP_SYSTEM_CONFIG_USE_SOCKETS
-    // Set the select timeout to 100ms
-    struct timeval aSleepTime;
-    aSleepTime.tv_sec  = 0;
-    aSleepTime.tv_usec = 100 * 1000;
-
-    fd_set readFDs, writeFDs, exceptFDs;
-    int numFDs = 0;
-
-    FD_ZERO(&readFDs);
-    FD_ZERO(&writeFDs);
-    FD_ZERO(&exceptFDs);
-
-    if (ctx.mSystemLayer.State() == System::kLayerState_Initialized)
-        ctx.mSystemLayer.PrepareSelect(numFDs, &readFDs, &writeFDs, &exceptFDs, aSleepTime);
-
-    if (ctx.mInetLayer.State == Inet::InetLayer::kState_Initialized)
-        ctx.mInetLayer.PrepareSelect(numFDs, &readFDs, &writeFDs, &exceptFDs, aSleepTime);
-
-    int selectRes = select(numFDs, &readFDs, &writeFDs, &exceptFDs, &aSleepTime);
-    if (selectRes < 0)
+    CHIP_ERROR SendMessage(const MessageHeader & header, const PeerAddress & address, System::PacketBuffer * msgBuf) override
     {
-        printf("select failed: %s\n", ErrorStr(System::MapErrorPOSIX(errno)));
-        NL_TEST_ASSERT(ctx.mSuite, false);
-        return;
+        HandleMessageReceived(header, address, msgBuf);
+        return CHIP_NO_ERROR;
     }
 
-    if (ctx.mSystemLayer.State() == System::kLayerState_Initialized)
-    {
-        ctx.mSystemLayer.HandleSelectResult(selectRes, &readFDs, &writeFDs, &exceptFDs);
-    }
+    bool CanSendToPeer(const PeerAddress & address) override { return true; }
+};
 
-    if (ctx.mInetLayer.State == Inet::InetLayer::kState_Initialized)
-    {
-        ctx.mInetLayer.HandleSelectResult(selectRes, &readFDs, &writeFDs, &exceptFDs);
-    }
-#endif
-}
-
-static CHIP_ERROR InitLayers(System::Layer & systemLayer, InetLayer & inetLayer)
+class TestSessMgrCallback : public SecureSessionMgrCallback
 {
-    CHIP_ERROR err = CHIP_NO_ERROR;
-    // Initialize the CHIP System Layer.
-    err = systemLayer.Init(NULL);
-    SuccessOrExit(err);
+public:
+    virtual void OnMessageReceived(const MessageHeader & header, PeerConnectionState * state, System::PacketBuffer * msgBuf,
+                                   SecureSessionMgrBase * mgr)
+    {
+        NL_TEST_ASSERT(mSuite, header.GetSourceNodeId() == Optional<NodeId>::Value(kSourceNodeId));
+        NL_TEST_ASSERT(mSuite, header.GetDestinationNodeId() == Optional<NodeId>::Value(kDestinationNodeId));
+        NL_TEST_ASSERT(mSuite, state->GetPeerNodeId() == kDestinationNodeId);
 
-    // Initialize the CHIP Inet layer.
-    err = inetLayer.Init(systemLayer, NULL);
-    SuccessOrExit(err);
+        size_t data_len = msgBuf->DataLength();
 
-exit:
-    return err;
-}
+        int compare = memcmp(msgBuf->Start(), PAYLOAD, data_len);
+        NL_TEST_ASSERT(mSuite, compare == 0);
+
+        ReceiveHandlerCallCount++;
+    }
+
+    virtual void OnNewConnection(PeerConnectionState * state, SecureSessionMgrBase * mgr)
+    {
+        CHIP_ERROR err;
+
+        NewConnectionHandlerCallCount++;
+
+        err = state->GetSecureSession().TemporaryManualKeyExchange(remote_public_key, sizeof(remote_public_key), local_private_key,
+                                                                   sizeof(local_private_key));
+        NL_TEST_ASSERT(mSuite, err == CHIP_NO_ERROR);
+    }
+
+    nlTestSuite * mSuite              = nullptr;
+    int ReceiveHandlerCallCount       = 0;
+    int NewConnectionHandlerCallCount = 0;
+};
+
+TestSessMgrCallback callback;
 
 void CheckSimpleInitTest(nlTestSuite * inSuite, void * inContext)
 {
     TestContext & ctx = *reinterpret_cast<TestContext *>(inContext);
 
-    SecureSessionMgr conn;
+    SecureSessionMgr<LoopbackTransport> conn;
     CHIP_ERROR err;
 
-    err = conn.Init(kSourceNodeId, &ctx.mInetLayer, Transport::UdpListenParameters());
+    ctx.GetInetLayer().SystemLayer()->Init(NULL);
+
+    err = conn.Init(kSourceNodeId, ctx.GetInetLayer().SystemLayer(), "LOOPBACK");
     NL_TEST_ASSERT(inSuite, err == CHIP_NO_ERROR);
 }
 
@@ -162,6 +127,8 @@ void CheckMessageTest(nlTestSuite * inSuite, void * inContext)
 
     size_t payload_len = sizeof(PAYLOAD);
 
+    ctx.GetInetLayer().SystemLayer()->Init(NULL);
+
     chip::System::PacketBuffer * buffer = chip::System::PacketBuffer::NewWithAvailableSize(payload_len);
     memmove(buffer->Start(), PAYLOAD, payload_len);
     buffer->SetDataLength(payload_len);
@@ -170,30 +137,30 @@ void CheckMessageTest(nlTestSuite * inSuite, void * inContext)
     IPAddress::FromString("127.0.0.1", addr);
     CHIP_ERROR err = CHIP_NO_ERROR;
 
-    SecureSessionMgr conn;
+    SecureSessionMgr<LoopbackTransport> conn;
 
-    err = conn.Init(kSourceNodeId, &ctx.mInetLayer, Transport::UdpListenParameters().SetAddressType(addr.Type()));
+    err = conn.Init(kSourceNodeId, ctx.GetInetLayer().SystemLayer(), "LOOPBACK");
     NL_TEST_ASSERT(inSuite, err == CHIP_NO_ERROR);
 
-    conn.SetNewConnectionHandler(NewConnectionHandler, inSuite);
-    conn.SetMessageReceiveHandler(MessageReceiveHandler, inSuite);
+    callback.mSuite = inSuite;
 
-    NewConnectionHandlerCallCount = 0;
-    err                           = conn.Connect(kDestinationNodeId, Transport::PeerAddress::UDP(addr));
+    conn.SetDelegate(&callback);
+
+    callback.NewConnectionHandlerCallCount = 0;
+
+    err = conn.Connect(kDestinationNodeId, PeerAddress::UDP(addr));
     NL_TEST_ASSERT(inSuite, err == CHIP_NO_ERROR);
-    NL_TEST_ASSERT(inSuite, NewConnectionHandlerCallCount == 1);
+    NL_TEST_ASSERT(inSuite, callback.NewConnectionHandlerCallCount == 1);
 
     // Should be able to send a message to itself by just calling send.
-    ReceiveHandlerCallCount = 0;
-    err                     = conn.SendMessage(kDestinationNodeId, buffer);
+    callback.ReceiveHandlerCallCount = 0;
+
+    err = conn.SendMessage(kDestinationNodeId, buffer);
     NL_TEST_ASSERT(inSuite, err == CHIP_NO_ERROR);
 
-    // allow the send and recv enough time
-    DriveIO(ctx);
-    sleep(1);
-    DriveIO(ctx);
+    ctx.DriveIOUntil(1000 /* ms */, []() { return callback.ReceiveHandlerCallCount != 0; });
 
-    NL_TEST_ASSERT(inSuite, ReceiveHandlerCallCount == 1);
+    NL_TEST_ASSERT(inSuite, callback.ReceiveHandlerCallCount == 1);
 }
 
 // Test Suite
@@ -202,7 +169,7 @@ void CheckMessageTest(nlTestSuite * inSuite, void * inContext)
  *  Test Suite that lists all the test functions.
  */
 // clang-format off
-static const nlTest sTests[] =
+const nlTest sTests[] =
 {
     NL_TEST_DEF("Simple Init Test",              CheckSimpleInitTest),
     NL_TEST_DEF("Message Self Test",             CheckMessageTest),
@@ -211,8 +178,11 @@ static const nlTest sTests[] =
 };
 // clang-format on
 
+int Initialize(void * aContext);
+int Finalize(void * aContext);
+
 // clang-format off
-static nlTestSuite sSuite =
+nlTestSuite sSuite =
 {
     "Test-CHIP-Connection",
     &sTests[0],
@@ -224,43 +194,22 @@ static nlTestSuite sSuite =
 /**
  *  Initialize the test suite.
  */
-static int Initialize(void * aContext)
+int Initialize(void * aContext)
 {
-    TestContext & lContext = *reinterpret_cast<TestContext *>(aContext);
-
-    CHIP_ERROR err = InitLayers(lContext.mSystemLayer, lContext.mInetLayer);
-    if (err != CHIP_NO_ERROR)
-    {
-        return FAILURE;
-    }
-    lContext.mSuite = &sSuite;
-
-    return SUCCESS;
+    CHIP_ERROR err = reinterpret_cast<TestContext *>(aContext)->Init(&sSuite);
+    return (err == CHIP_NO_ERROR) ? SUCCESS : FAILURE;
 }
 
 /**
  *  Finalize the test suite.
  */
-static int Finalize(void * aContext)
+int Finalize(void * aContext)
 {
-    CHIP_ERROR err = CHIP_NO_ERROR;
-
-    TestContext & lContext = *reinterpret_cast<TestContext *>(aContext);
-
-    lContext.mSuite = NULL;
-
-    err = lContext.mSystemLayer.Shutdown();
-    if (err != CHIP_NO_ERROR)
-    {
-        return FAILURE;
-    }
-    err = lContext.mInetLayer.Shutdown();
-    if (err != CHIP_NO_ERROR)
-    {
-        return FAILURE;
-    }
-    return SUCCESS;
+    CHIP_ERROR err = reinterpret_cast<TestContext *>(aContext)->Shutdown();
+    return (err == CHIP_NO_ERROR) ? SUCCESS : FAILURE;
 }
+
+} // namespace
 
 /**
  *  Main

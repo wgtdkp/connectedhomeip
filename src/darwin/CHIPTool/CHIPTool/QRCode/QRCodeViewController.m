@@ -18,6 +18,7 @@
 #import "QRCodeViewController.h"
 
 // local imports
+#import "DefaultsUtils.h"
 #import <CHIP/CHIP.h>
 
 // system imports
@@ -29,12 +30,12 @@
 
 // The expected Vendor ID for CHIP demos
 // Spells CHIP on a dialer
-#define EXAMPLE_VENDOR_ID 3447
-#define EXAMPLE_VENDOR_TAG_SSID 1
-#define MAX_SSID_LEN 32
+#define EXAMPLE_VENDOR_ID 2447
 
-#define EXAMPLE_VENDOR_TAG_IP 2
+#define EXAMPLE_VENDOR_TAG_IP 1
 #define MAX_IP_LEN 46
+
+#define NETWORK_CHIP_PREFIX @"CHIP-"
 
 #define NOT_APPLICABLE_STRING @"N/A"
 
@@ -61,11 +62,49 @@ static NSString * const ipKey = @"ipk";
     _resetButton.clipsToBounds = YES;
     _manualCodeTextField.keyboardType = UIKeyboardTypeNumberPad;
 
+    __weak typeof(self) weakSelf = self;
+    self.onConnectedBlock = ^() {
+        typeof(self) strongSelf = weakSelf;
+        [strongSelf onConnected];
+    };
+
+    self.onMessageBlock = ^(NSString * message) {
+        typeof(self) strongSelf = weakSelf;
+        [strongSelf onMessage:message];
+    };
+
+    self.onErrorBlock = ^(NSString * error) {
+        typeof(self) strongSelf = weakSelf;
+        [strongSelf onError:error];
+    };
+
     UITapGestureRecognizer * tap = [[UITapGestureRecognizer alloc] initWithTarget:self action:@selector(dismissKeyboard)];
     [self.view addGestureRecognizer:tap];
 
     [self manualCodeInitialState];
     [self qrCodeInitialState];
+}
+
+- (void)onConnected
+{
+    [self retrieveAndSendWifiCredentials];
+}
+
+- (void)onMessage:(NSString *)message
+{
+    [[NSUserDefaults standardUserDefaults] setObject:message forKey:ipKey];
+    NSError * error;
+    [self.chipController disconnect:&error];
+}
+
+- (void)onError:(NSString *)error
+{
+    NSLog(@"Receive an error: %@", error);
+}
+
+- (void)viewDidDisappear:(BOOL)animated
+{
+    [super viewDidDisappear:animated];
 }
 
 - (void)dismissKeyboard
@@ -150,74 +189,183 @@ static NSString * const ipKey = @"ipk";
     if ([self hasScannedConnectionInfo]) {
         [[NSUserDefaults standardUserDefaults] removeObjectForKey:ipKey];
     }
+    self->_setupPayloadView.hidden = NO;
+    self->_resetButton.hidden = NO;
 
-    if (decimalString) {
-        self->_manualCodeLabel.hidden = NO;
-        self->_manualCodeLabel.text = decimalString;
-        self->_versionLabel.text = NOT_APPLICABLE_STRING;
-        self->_discriminatorLabel.text = [NSString stringWithFormat:@"%@", payload.discriminator];
-        self->_setupPinCodeLabel.text = [NSString stringWithFormat:@"%@", payload.setUpPINCode];
-        self->_rendezVousInformation.text = NOT_APPLICABLE_STRING;
-        self->_serialNumber.text = NOT_APPLICABLE_STRING;
-        // TODO: Only display vid and pid if present
-        self->_vendorID.text = [NSString stringWithFormat:@"%@", payload.vendorID];
-        self->_productID.text = [NSString stringWithFormat:@"%@", payload.productID];
+    [self updateUIFields:payload decimalString:decimalString];
+    [self parseOptionalData:payload];
+    [self handleRendezVous:payload];
+}
+
+- (void)retrieveAndSendWifiCredentials
+{
+    UIAlertController * alertController =
+        [UIAlertController alertControllerWithTitle:@"Wifi Configuration"
+                                            message:@"Input network SSID and password that your phone is connected to."
+                                     preferredStyle:UIAlertControllerStyleAlert];
+    [alertController addTextFieldWithConfigurationHandler:^(UITextField * textField) {
+        textField.placeholder = @"Network SSID";
+        textField.clearButtonMode = UITextFieldViewModeWhileEditing;
+        textField.borderStyle = UITextBorderStyleRoundedRect;
+
+        NSString * networkSSID = CHIPGetDomainValueForKey(kCHIPToolDefaultsDomain, kNetworkSSIDDefaultsKey);
+        if ([networkSSID length] > 0) {
+            textField.text = networkSSID;
+        }
+    }];
+    [alertController addTextFieldWithConfigurationHandler:^(UITextField * textField) {
+        [textField setSecureTextEntry:YES];
+        textField.placeholder = @"Password";
+        textField.clearButtonMode = UITextFieldViewModeWhileEditing;
+        textField.borderStyle = UITextBorderStyleRoundedRect;
+        textField.secureTextEntry = YES;
+
+        NSString * networkPassword = CHIPGetDomainValueForKey(kCHIPToolDefaultsDomain, kNetworkPasswordDefaultsKey);
+        if ([networkPassword length] > 0) {
+            textField.text = networkPassword;
+        }
+    }];
+    [alertController addAction:[UIAlertAction actionWithTitle:@"Cancel"
+                                                        style:UIAlertActionStyleDefault
+                                                      handler:^(UIAlertAction * action) {
+                                                      }]];
+
+    __weak typeof(self) weakSelf = self;
+    [alertController
+        addAction:[UIAlertAction actionWithTitle:@"Send"
+                                           style:UIAlertActionStyleDefault
+                                         handler:^(UIAlertAction * action) {
+                                             typeof(self) strongSelf = weakSelf;
+                                             if (strongSelf) {
+                                                 NSArray * textfields = alertController.textFields;
+                                                 UITextField * networkSSID = textfields[0];
+                                                 UITextField * networkPassword = textfields[1];
+                                                 if ([networkSSID.text length] > 0) {
+                                                     CHIPSetDomainValueForKey(
+                                                         kCHIPToolDefaultsDomain, kNetworkSSIDDefaultsKey, networkSSID.text);
+                                                 }
+
+                                                 if ([networkPassword.text length] > 0) {
+                                                     CHIPSetDomainValueForKey(kCHIPToolDefaultsDomain, kNetworkPasswordDefaultsKey,
+                                                         networkPassword.text);
+                                                 }
+                                                 NSLog(@"New SSID: %@ Password: %@", networkSSID.text, networkPassword.text);
+
+                                                 [strongSelf sendWifiCredentialsWithSSID:networkSSID.text
+                                                                                password:networkPassword.text];
+                                             }
+                                         }]];
+    [self presentViewController:alertController animated:YES completion:nil];
+}
+
+- (void)sendWifiCredentialsWithSSID:(NSString *)ssid password:(NSString *)password
+{
+    NSString * msg = [NSString stringWithFormat:@"%@:%@", ssid, password];
+    NSError * error;
+    BOOL didSend = [self.chipController sendMessage:[msg dataUsingEncoding:NSUTF8StringEncoding] error:&error];
+    if (!didSend) {
+        NSLog(@"Error: %@", error.localizedDescription);
     } else {
-        self->_manualCodeLabel.hidden = YES;
-        self->_versionLabel.text = [NSString stringWithFormat:@"%@", payload.version];
-        self->_discriminatorLabel.text = [NSString stringWithFormat:@"%@", payload.discriminator];
-        self->_setupPinCodeLabel.text = [NSString stringWithFormat:@"%@", payload.setUpPINCode];
-        self->_rendezVousInformation.text = [NSString stringWithFormat:@"%lu", payload.rendezvousInformation];
+        NSLog(@"Message Sent");
+    }
+}
+
+- (void)updateUIFields:(CHIPSetupPayload *)payload decimalString:(nullable NSString *)decimalString
+{
+    if (decimalString) {
+        _manualCodeLabel.hidden = NO;
+        _manualCodeLabel.text = decimalString;
+        _versionLabel.text = NOT_APPLICABLE_STRING;
+        _rendezVousInformation.text = NOT_APPLICABLE_STRING;
+        _serialNumber.text = NOT_APPLICABLE_STRING;
+    } else {
+        _manualCodeLabel.hidden = YES;
+        _versionLabel.text = [NSString stringWithFormat:@"%@", payload.version];
+        _rendezVousInformation.text = [NSString stringWithFormat:@"%lu", payload.rendezvousInformation];
         if ([payload.serialNumber length] > 0) {
             self->_serialNumber.text = payload.serialNumber;
         } else {
             self->_serialNumber.text = NOT_APPLICABLE_STRING;
         }
-        // TODO: Only display vid and pid if present
-        self->_vendorID.text = [NSString stringWithFormat:@"%@", payload.vendorID];
-        self->_productID.text = [NSString stringWithFormat:@"%@", payload.productID];
     }
-    self->_setupPayloadView.hidden = NO;
-    self->_resetButton.hidden = NO;
 
+    _discriminatorLabel.text = [NSString stringWithFormat:@"%@", payload.discriminator];
+    _setupPinCodeLabel.text = [NSString stringWithFormat:@"%@", payload.setUpPINCode];
+    // TODO: Only display vid and pid if present
+    _vendorID.text = [NSString stringWithFormat:@"%@", payload.vendorID];
+    _productID.text = [NSString stringWithFormat:@"%@", payload.productID];
+}
+
+- (void)parseOptionalData:(CHIPSetupPayload *)payload
+{
     NSLog(@"Payload vendorID %@", payload.vendorID);
-    if ([payload.vendorID isEqualToNumber:[NSNumber numberWithInt:EXAMPLE_VENDOR_ID]]) {
-        NSArray * optionalInfo = [payload getAllOptionalVendorData:nil];
-        NSLog(@"Count of payload info %@", @(optionalInfo.count));
-        for (CHIPOptionalQRCodeInfo * info in optionalInfo) {
-            NSNumber * tag = info.tag;
-            if (tag) {
-                switch (tag.unsignedCharValue) {
-                case EXAMPLE_VENDOR_TAG_SSID:
-                    if ([info.infoType isEqualToNumber:[NSNumber numberWithInt:kOptionalQRCodeInfoTypeString]]) {
-                        if ([info.stringValue length] > MAX_SSID_LEN) {
-                            NSLog(@"Unexpected SSID String...");
-                        } else {
-                            // show SoftAP detection
-                            [self RequestConnectSoftAPWithSSID:info.stringValue];
-                        }
-                    }
-                    break;
-                case EXAMPLE_VENDOR_TAG_IP:
-                    if ([info.infoType isEqualToNumber:[NSNumber numberWithInt:kOptionalQRCodeInfoTypeString]]) {
-                        if ([info.stringValue length] > MAX_IP_LEN) {
-                            NSLog(@"Unexpected IP String... %@", info.stringValue);
-                        } else {
-                            NSLog(@"Got IP String... %@", info.stringValue);
-                            [[NSUserDefaults standardUserDefaults] setObject:info.stringValue forKey:ipKey];
-                        }
-                    }
-                    break;
-                }
+    BOOL isSameVendorID = [payload.vendorID isEqualToNumber:[NSNumber numberWithInt:EXAMPLE_VENDOR_ID]];
+    if (!isSameVendorID) {
+        return;
+    }
+
+    NSArray * optionalInfo = [payload getAllOptionalVendorData:nil];
+    for (CHIPOptionalQRCodeInfo * info in optionalInfo) {
+        NSNumber * tag = info.tag;
+        if (!tag) {
+            continue;
+        }
+
+        BOOL isTypeString = [info.infoType isEqualToNumber:[NSNumber numberWithInt:kOptionalQRCodeInfoTypeString]];
+        if (!isTypeString) {
+            return;
+        }
+
+        NSString * infoValue = info.stringValue;
+        switch (tag.unsignedCharValue) {
+        case EXAMPLE_VENDOR_TAG_IP:
+            if ([infoValue length] > MAX_IP_LEN) {
+                NSLog(@"Unexpected IP String... %@", infoValue);
+            } else {
+                NSLog(@"Got IP String... %@", infoValue);
+                [[NSUserDefaults standardUserDefaults] setObject:infoValue forKey:ipKey];
             }
+            break;
         }
     }
 }
 
-- (void)RequestConnectSoftAPWithSSID:(NSString *)ssid
+- (void)handleRendezVous:(CHIPSetupPayload *)payload
 {
-    NSString * message = [NSString
-        stringWithFormat:@"The scanned CHIP accessory supports a SoftAP.\n\nSSID: %@\n\nUse WiFi Settings to connect to it.", ssid];
+    switch (payload.rendezvousInformation) {
+    case kRendezvousInformationNone:
+    case kRendezvousInformationThread:
+    case kRendezvousInformationEthernet:
+    case kRendezvousInformationAllMask:
+        NSLog(@"Rendezvous Unknown");
+        break;
+    case kRendezvousInformationWiFi:
+        NSLog(@"Rendezvous Wi-Fi");
+        [self handleRendezVousWiFi:[self getNetworkName:payload.discriminator]];
+        break;
+    case kRendezvousInformationBLE:
+        NSLog(@"Rendezvous BLE");
+        [self handleRendezVousBLE:payload.discriminator.unsignedShortValue setupPINCode:payload.setUpPINCode.unsignedIntValue];
+        break;
+    }
+}
+
+- (NSString *)getNetworkName:(NSNumber *)discriminator
+{
+    NSString * peripheralDiscriminator = [NSString stringWithFormat:@"%04u", discriminator.unsignedShortValue];
+    NSString * peripheralFullName = [NSString stringWithFormat:@"%@%@", NETWORK_CHIP_PREFIX, peripheralDiscriminator];
+    return peripheralFullName;
+}
+
+- (void)handleRendezVousBLE:(uint16_t)discriminator setupPINCode:(uint32_t)setupPINCode
+{
+    NSError * error;
+    [self.chipController connect:discriminator setupPINCode:setupPINCode error:&error];
+}
+
+- (void)handleRendezVousWiFi:(NSString *)name
+{
+    NSString * message = [NSString stringWithFormat:@"SSID: %@\n\nUse WiFi Settings to connect to it.", name];
     UIAlertController * alert = [UIAlertController alertControllerWithTitle:@"SoftAP Detected"
                                                                     message:message
                                                              preferredStyle:UIAlertControllerStyleActionSheet];

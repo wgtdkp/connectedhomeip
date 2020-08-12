@@ -1,3 +1,21 @@
+/*
+ *   Copyright (c) 2020 Project CHIP Authors
+ *   All rights reserved.
+ *
+ *   Licensed under the Apache License, Version 2.0 (the "License");
+ *   you may not use this file except in compliance with the License.
+ *   You may obtain a copy of the License at
+ *
+ *       http://www.apache.org/licenses/LICENSE-2.0
+ *
+ *   Unless required by applicable law or agreed to in writing, software
+ *   distributed under the License is distributed on an "AS IS" BASIS,
+ *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ *   See the License for the specific language governing permissions and
+ *   limitations under the License.
+ *
+ */
+
 package com.google.chip.chiptool;
 
 import android.os.Bundle;
@@ -25,14 +43,26 @@ public class OnOffActivity extends AppCompatActivity implements View.OnClickList
   public static class OnOffFragment extends Fragment {
     OnOffActivity activity;
 
+    private CommissionedDeviceAdapter deviceAdapter;
+    private CommissionedDeviceDiscoverer deviceDiscoverer;
+
     OnOffFragment(OnOffActivity activity) {
       this.activity = activity;
     }
 
     @Override
+    public void onCreate(Bundle savedInstanceState) {
+      super.onCreate(savedInstanceState);
+
+      deviceAdapter = new CommissionedDeviceAdapter(getContext());
+      deviceDiscoverer = new CommissionedDeviceDiscoverer(getContext(), deviceAdapter);
+      deviceDiscoverer.start();
+    }
+
+    @Override
     public View onCreateView(
         LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-      View inflated = inflater.inflate(R.xml.on_off_fragment, container, false);
+      View inflated = inflater.inflate(R.layout.on_off_fragment, container, false);
 
       inflated.findViewById(R.id.send_on_request).setOnClickListener(activity);
 
@@ -48,8 +78,6 @@ public class OnOffActivity extends AppCompatActivity implements View.OnClickList
                   activity.finish();
                 }
               });
-
-      ConnectionStatusFragment.updateStatus(activity);
       return inflated;
     }
 
@@ -57,12 +85,15 @@ public class OnOffActivity extends AppCompatActivity implements View.OnClickList
     public void onViewCreated(View view, Bundle savedInstanceState) {
       super.onViewCreated(view, savedInstanceState);
     }
+
+    @Override
+    public void onDestroy() {
+      super.onDestroy();
+
+      deviceDiscoverer.stop();
+    }
   }
 
   @Override
-  public void onClick(View view) {
-    if (view.getId() == R.id.send_echo_request) {
-      ConnectionStatusFragment.updateStatus(this);
-    }
-  }
+  public void onClick(View view) {}
 }

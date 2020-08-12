@@ -40,7 +40,7 @@
 // Include system and language headers
 #include <stddef.h>
 
-#if CHIP_SYSTEM_CONFIG_USE_SOCKETS
+#if CHIP_SYSTEM_CONFIG_USE_SOCKETS || CHIP_SYSTEM_CONFIG_USE_NETWORK_FRAMEWORK
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -64,6 +64,8 @@
 
 namespace chip {
 namespace System {
+
+using namespace ::chip::Callback;
 
 #if CHIP_SYSTEM_CONFIG_USE_LWIP
 bool LwIPEventHandlerDelegate::IsInitialized() const
@@ -95,23 +97,16 @@ Layer::Layer() : mLayerState(kLayerState_NotInitialized), mContext(NULL), mPlatf
     this->mTimerComplete     = false;
 #endif // CHIP_SYSTEM_CONFIG_USE_LWIP
 
-#if CHIP_SYSTEM_CONFIG_USE_SOCKETS
-    this->mWakePipeIn  = 0;
-    this->mWakePipeOut = 0;
-
+#if CHIP_SYSTEM_CONFIG_USE_SOCKETS || CHIP_SYSTEM_CONFIG_USE_NETWORK_FRAMEWORK
 #if CHIP_SYSTEM_CONFIG_POSIX_LOCKING
     this->mHandleSelectThread = PTHREAD_NULL;
 #endif // CHIP_SYSTEM_CONFIG_POSIX_LOCKING
-#endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS
+#endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS || CHIP_SYSTEM_CONFIG_USE_NETWORK_FRAMEWORK
 }
 
 Error Layer::Init(void * aContext)
 {
     Error lReturn;
-#if CHIP_SYSTEM_CONFIG_USE_SOCKETS
-    int lPipeFDs[2];
-    int lOSReturn, lFlags;
-#endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS
 
     RegisterLayerErrorFormatter();
 #if CHIP_SYSTEM_CONFIG_USE_SOCKETS
@@ -131,23 +126,11 @@ Error Layer::Init(void * aContext)
     this->AddEventHandlerDelegate(sSystemEventHandlerDelegate);
 #endif // CHIP_SYSTEM_CONFIG_USE_LWIP
 
-#if CHIP_SYSTEM_CONFIG_USE_SOCKETS
-    // Create a Unix pipe to allow an arbitrary thread to wake the thread in the select loop.
-    lOSReturn = ::pipe(lPipeFDs);
-    VerifyOrExit(lOSReturn == 0, lReturn = chip::System::MapErrorPOSIX(errno));
-
-    this->mWakePipeIn  = lPipeFDs[0];
-    this->mWakePipeOut = lPipeFDs[1];
-
-    // Enable non-blocking mode for both ends of the pipe.
-    lFlags    = ::fcntl(this->mWakePipeIn, F_GETFL, 0);
-    lOSReturn = ::fcntl(this->mWakePipeIn, F_SETFL, lFlags | O_NONBLOCK);
-    VerifyOrExit(lOSReturn == 0, lReturn = chip::System::MapErrorPOSIX(errno));
-
-    lFlags    = ::fcntl(this->mWakePipeOut, F_GETFL, 0);
-    lOSReturn = ::fcntl(this->mWakePipeOut, F_SETFL, lFlags | O_NONBLOCK);
-    VerifyOrExit(lOSReturn == 0, lReturn = chip::System::MapErrorPOSIX(errno));
-#endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS
+#if CHIP_SYSTEM_CONFIG_USE_SOCKETS || CHIP_SYSTEM_CONFIG_USE_NETWORK_FRAMEWORK
+    // Create an event to allow an arbitrary thread to wake the thread in the select loop.
+    lReturn = this->mWakeEvent.Open();
+    SuccessOrExit(lReturn);
+#endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS || CHIP_SYSTEM_CONFIG_USE_NETWORK_FRAMEWORK
 
     this->mLayerState = kLayerState_Initialized;
     this->mContext    = aContext;
@@ -169,14 +152,9 @@ Error Layer::Shutdown()
     lReturn  = Platform::Layer::WillShutdown(*this, lContext);
     SuccessOrExit(lReturn);
 
-#if CHIP_SYSTEM_CONFIG_USE_SOCKETS
-    if (this->mWakePipeOut != -1)
-    {
-        ::close(this->mWakePipeOut);
-        this->mWakePipeOut = -1;
-        this->mWakePipeIn  = -1;
-    }
-#endif
+#if CHIP_SYSTEM_CONFIG_USE_SOCKETS || CHIP_SYSTEM_CONFIG_USE_NETWORK_FRAMEWORK
+    mWakeEvent.Close();
+#endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS || CHIP_SYSTEM_CONFIG_USE_NETWORK_FRAMEWORK
 
     for (size_t i = 0; i < Timer::sPool.Size(); ++i)
     {
@@ -235,6 +213,56 @@ Error Layer::NewTimer(Timer *& aTimerPtr)
     }
 
     return CHIP_SYSTEM_NO_ERROR;
+}
+
+static bool TimerReady(void * p, const Cancelable * timer)
+{
+    const Timer::Epoch * kCurrentEpoch = static_cast<const Timer::Epoch *>(p);
+    return !Timer::IsEarlierEpoch(*kCurrentEpoch, timer->mInfoScalar);
+}
+
+static int TimerCompare(void * p, const Cancelable * a, const Cancelable * b)
+{
+    (void) p;
+    return (a->mInfoScalar > b->mInfoScalar) ? 1 : (a->mInfoScalar < b->mInfoScalar) ? -1 : 0;
+}
+
+/**
+ * @brief
+ *   This method starts a one-shot timer.
+ *
+ *   @note
+ *       Only a single timer is allowed to be started with the same @a aComplete and @a aAppState
+ *       arguments. If called with @a aComplete and @a aAppState identical to an existing timer,
+ *       the currently-running timer will first be cancelled.
+ *
+ *   @param[in]  aMilliseconds Expiration time in milliseconds.
+ *   @param[in]  aCallback     A pointer to the Callback that fires when the timer expires
+ *
+ *   @return CHIP_SYSTEM_NO_ERROR On success.
+ *   @return Other Value indicating timer failed to start.
+ *
+ */
+void Layer::StartTimer(uint32_t aMilliseconds, chip::Callback::Callback<> * cb)
+{
+    Cancelable * ca = cb->Cancel();
+
+    ca->mInfoScalar = Timer::GetCurrentEpoch() + aMilliseconds;
+
+    mTimerCallbacks.InsertBy(ca, TimerCompare, nullptr);
+
+#if CHIP_SYSTEM_CONFIG_USE_LWIP
+    if (mTimerCallbacks.First() == ca)
+    {
+        // this is the new earliest timer and so the timer needs (re-)starting provided that
+        // the system is not currently processing expired timers, in which case it is left to
+        // HandleExpiredTimers() to re-start the timer.
+        if (!mTimerComplete)
+        {
+            StartPlatformTimer(aMilliseconds);
+        }
+    }
+#endif // CHIP_SYSTEM_CONFIG_USE_LWIP
 }
 
 /**
@@ -529,7 +557,24 @@ Error Layer::SetClock_RealTime(uint64_t newCurTime)
     return Platform::Layer::SetClock_RealTime(newCurTime);
 }
 
-#if CHIP_SYSTEM_CONFIG_USE_SOCKETS
+/**
+ * @brief
+ *   Run any timers that are due based on input current time
+ */
+void Layer::DispatchTimerCallbacks(const uint64_t kCurrentEpoch)
+{
+    // dispatch TimerCallbacks
+    Cancelable ready = mTimerCallbacks.DequeueBy(TimerReady, (void *) &kCurrentEpoch);
+    while (ready.mNext != &ready)
+    {
+        // one-shot
+        chip::Callback::Callback<> * cb = chip::Callback::Callback<>::FromCancelable(ready.mNext);
+        cb->Cancel();
+        cb->mCall(cb->mContext);
+    }
+}
+
+#if CHIP_SYSTEM_CONFIG_USE_SOCKETS || CHIP_SYSTEM_CONFIG_USE_NETWORK_FRAMEWORK
 
 /**
  *  Prepare the sets of file descriptors for @p select() to work with.
@@ -546,10 +591,11 @@ void Layer::PrepareSelect(int & aSetSize, fd_set * aReadSet, fd_set * aWriteSet,
     if (this->State() != kLayerState_Initialized)
         return;
 
-    if (this->mWakePipeIn + 1 > aSetSize)
-        aSetSize = this->mWakePipeIn + 1;
+    const int wakeEventFd = this->mWakeEvent.GetNotifFD();
+    FD_SET(wakeEventFd, aReadSet);
 
-    FD_SET(this->mWakePipeIn, aReadSet);
+    if (wakeEventFd + 1 > aSetSize)
+        aSetSize = wakeEventFd + 1;
 
     const Timer::Epoch kCurrentEpoch = Timer::GetCurrentEpoch();
     Timer::Epoch lAwakenEpoch = kCurrentEpoch + static_cast<Timer::Epoch>(aSleepTime.tv_sec) * 1000 + aSleepTime.tv_usec / 1000;
@@ -571,6 +617,16 @@ void Layer::PrepareSelect(int & aSetSize, fd_set * aReadSet, fd_set * aWriteSet,
         }
     }
 
+    // check for an earlier callback timer, too
+    if (lAwakenEpoch != kCurrentEpoch)
+    {
+        Cancelable * ca = mTimerCallbacks.First();
+        if (ca != nullptr && !Timer::IsEarlierEpoch(kCurrentEpoch, ca->mInfoScalar))
+        {
+            lAwakenEpoch = ca->mInfoScalar;
+        }
+    }
+
     const Timer::Epoch kSleepTime = lAwakenEpoch - kCurrentEpoch;
     aSleepTime.tv_sec             = kSleepTime / 1000;
     aSleepTime.tv_usec            = (kSleepTime % 1000) * 1000;
@@ -582,10 +638,11 @@ void Layer::PrepareSelect(int & aSetSize, fd_set * aReadSet, fd_set * aWriteSet,
  *
  * @note
  *  It is important to set the pending I/O fields for all endpoints *before* making any callbacks. This avoids the case where an
- *  endpoint is closed and then re-opened within the callback for another endpoint. When this happens the new endpoint is likely to
- *  be assigned the same file descriptor as the old endpoint. However, any pending I/O for that file descriptor number represents
- *  I/O related to the old incarnation of the endpoint, not the current one. Saving the pending I/O state in each endpoint before
- *  acting on it allows the endpoint code to clear the I/O flags in the event of a close, thus avoiding any confusion.
+ *  endpoint is closed and then re-opened within the callback for another endpoint. When this happens the new endpoint is likely
+ * to be assigned the same file descriptor as the old endpoint. However, any pending I/O for that file descriptor number
+ * represents I/O related to the old incarnation of the endpoint, not the current one. Saving the pending I/O state in each
+ * endpoint before acting on it allows the endpoint code to clear the I/O flags in the event of a close, thus avoiding any
+ * confusion.
  *
  *  @param[in]    aSetSize          The return value of the select call.
  *  @param[in]    aReadSet          A pointer to the set of read file descriptors.
@@ -609,17 +666,9 @@ void Layer::HandleSelectResult(int aSetSize, fd_set * aReadSet, fd_set * aWriteS
 
     if (aSetSize > 0)
     {
-        // If we woke because of someone writing to the wake pipe, clear the contents of the pipe before returning.
-        if (FD_ISSET(this->mWakePipeIn, aReadSet))
-        {
-            while (true)
-            {
-                uint8_t lBytes[128];
-                int lTmp = ::read(this->mWakePipeIn, static_cast<void *>(lBytes), sizeof(lBytes));
-                if (lTmp < static_cast<int>(sizeof(lBytes)))
-                    break;
-            }
-        }
+        // If we woke because of someone writing to the wake event, clear the event before returning.
+        if (FD_ISSET(this->mWakeEvent.GetNotifFD(), aReadSet))
+            this->mWakeEvent.Confirm();
     }
 
     const Timer::Epoch kCurrentEpoch = Timer::GetCurrentEpoch();
@@ -638,6 +687,8 @@ void Layer::HandleSelectResult(int aSetSize, fd_set * aReadSet, fd_set * aWriteS
         }
     }
 
+    DispatchTimerCallbacks(kCurrentEpoch);
+
 #if CHIP_SYSTEM_CONFIG_POSIX_LOCKING
     this->mHandleSelectThread = PTHREAD_NULL;
 #endif // CHIP_SYSTEM_CONFIG_POSIX_LOCKING
@@ -647,8 +698,8 @@ void Layer::HandleSelectResult(int aSetSize, fd_set * aReadSet, fd_set * aWriteS
  * Wake up the I/O thread that monitors the file descriptors using select() by writing a single byte to the wake pipe.
  *
  *  @note
- *      If @p WakeSelect() is being called from within @p HandleSelectResult(), then writing to the wake pipe can be skipped, since
- *      the I/O thread is already awake.
+ *      If @p WakeSelect() is being called from within @p HandleSelectResult(), then writing to the wake pipe can be skipped,
+ * since the I/O thread is already awake.
  *
  *      Furthermore, we don't care if this write fails as the only reasonably likely failure is that the pipe is full, in which
  *      case the select calling thread is going to wake up anyway.
@@ -665,13 +716,11 @@ void Layer::WakeSelect()
     }
 #endif // CHIP_SYSTEM_CONFIG_POSIX_LOCKING
 
-    // Write a single byte to the wake pipe to wake up the select call.
-    const uint8_t kByte     = 0;
-    const ssize_t kIOResult = ::write(this->mWakePipeOut, &kByte, 1);
-    static_cast<void>(kIOResult);
+    // Send notification to wake up the select call.
+    this->mWakeEvent.Notify();
 }
 
-#endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS
+#endif // CHIP_SYSTEM_CONFIG_USE_SOCKETS || CHIP_SYSTEM_CONFIG_USE_NETWORK_FRAMEWORK
 
 #if CHIP_SYSTEM_CONFIG_USE_LWIP
 LwIPEventHandlerDelegate Layer::sSystemEventHandlerDelegate;
@@ -728,7 +777,8 @@ exit:
 }
 
 /**
- * This posts an event / message of the specified type with the provided argument to this instance's platform-specific event queue.
+ * This posts an event / message of the specified type with the provided argument to this instance's platform-specific event
+ * queue.
  *
  *  @param[in,out]  aTarget     A pointer to the CHIP System Layer object making the post request.
  *  @param[in]      aEventType  The type of event to post.
@@ -780,8 +830,8 @@ exit:
 /**
  * This dispatches the specified event for handling by this instance.
  *
- *  The unmarshalling of the type and arguments from the event is handled by a platform-specific hook which should then call back
- *  to Layer::HandleEvent for the actual dispatch.
+ *  The unmarshalling of the type and arguments from the event is handled by a platform-specific hook which should then call
+ * back to Layer::HandleEvent for the actual dispatch.
  *
  *  @param[in]  aEvent  The platform-specific event object to dispatch for handling.
  *
@@ -887,6 +937,9 @@ Error Layer::HandlePlatformTimer()
     VerifyOrExit(this->State() == kLayerState_Initialized, lReturn = CHIP_SYSTEM_ERROR_UNEXPECTED_STATE);
 
     lReturn = Timer::HandleExpiredTimers(*this);
+
+    DispatchTimerCallbacks(Timer::GetCurrentEpoch());
+
     SuccessOrExit(lReturn);
 
 exit:

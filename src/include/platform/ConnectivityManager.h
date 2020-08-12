@@ -25,6 +25,12 @@
 #define CONNECTIVITY_MANAGER_H
 
 namespace chip {
+
+namespace Ble {
+class BleLayer;
+class BLEEndPoint;
+} // namespace Ble
+
 namespace DeviceLayer {
 
 namespace Internal {
@@ -136,7 +142,7 @@ public:
     CHIP_ERROR SetThreadPollingConfig(const ThreadPollingConfig & pollingConfig);
     bool IsThreadAttached(void);
     bool IsThreadProvisioned(void);
-    void ClearThreadProvision(void);
+    void ErasePersistentInfo(void);
     bool HaveServiceConnectivityViaThread(void);
 
     // Internet connectivity methods
@@ -154,6 +160,10 @@ public:
     bool HaveServiceConnectivity(void);
 
     // CHIPoBLE service methods
+    Ble::BleLayer * GetBleLayer();
+    typedef void (*BleConnectionReceivedFunct)(Ble::BLEEndPoint * endpoint);
+    void AddCHIPoBLEConnectionHandler(BleConnectionReceivedFunct handler);
+    void RemoveCHIPoBLEConnectionHandler(void);
     CHIPoBLEServiceMode GetCHIPoBLEServiceMode(void);
     CHIP_ERROR SetCHIPoBLEServiceMode(CHIPoBLEServiceMode val);
     bool IsBLEAdvertisingEnabled(void);
@@ -441,14 +451,29 @@ inline bool ConnectivityManager::IsThreadProvisioned(void)
     return static_cast<ImplClass *>(this)->_IsThreadProvisioned();
 }
 
-inline void ConnectivityManager::ClearThreadProvision(void)
+inline void ConnectivityManager::ErasePersistentInfo(void)
 {
-    static_cast<ImplClass *>(this)->_ClearThreadProvision();
+    static_cast<ImplClass *>(this)->_ErasePersistentInfo();
 }
 
 inline bool ConnectivityManager::HaveServiceConnectivityViaThread(void)
 {
     return static_cast<ImplClass *>(this)->_HaveServiceConnectivityViaThread();
+}
+
+inline Ble::BleLayer * ConnectivityManager::GetBleLayer(void)
+{
+    return static_cast<ImplClass *>(this)->_GetBleLayer();
+}
+
+inline void ConnectivityManager::AddCHIPoBLEConnectionHandler(BleConnectionReceivedFunct handler)
+{
+    return static_cast<ImplClass *>(this)->_AddCHIPoBLEConnectionHandler(handler);
+}
+
+inline void ConnectivityManager::RemoveCHIPoBLEConnectionHandler(void)
+{
+    return static_cast<ImplClass *>(this)->_RemoveCHIPoBLEConnectionHandler();
 }
 
 inline ConnectivityManager::CHIPoBLEServiceMode ConnectivityManager::GetCHIPoBLEServiceMode(void)
