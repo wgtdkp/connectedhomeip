@@ -48,6 +48,8 @@ extern "C" void emberAfPostAttributeChangeCallback(uint8_t endpoint, EmberAfClus
         return;
     }
 
+    NRF_LOG_INFO("emberAfPostAttributeChangeCallback() => %s", *value ? "BoltLockManager::LOCK_ACTION" : "BoltLockManager::UNLOCK_ACTION");
+
     if (*value)
     {
         BoltLockMgr().InitiateAction(0, BoltLockManager::LOCK_ACTION);

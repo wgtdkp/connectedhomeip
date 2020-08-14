@@ -65,6 +65,8 @@ static LEDWidget sLockLED;
 static LEDWidget sUnusedLED;
 static LEDWidget sUnusedLED_1;
 
+static LEDWidget sLockStatusLED;
+
 static bool sIsThreadProvisioned     = false;
 static bool sIsThreadEnabled         = false;
 static bool sIsThreadAttached        = false;
@@ -107,6 +109,9 @@ int AppTask::Init()
 
     sLockLED.Init(LOCK_STATE_LED);
     sLockLED.Set(!BoltLockMgr().IsUnlocked());
+
+    sLockStatusLED.Init(LOCK_STATE_LED_GPIO);
+    sLockStatusLED.Set(!BoltLockMgr().IsUnlocked());
 
     sUnusedLED.Init(BSP_LED_2);
     sUnusedLED_1.Init(BSP_LED_3);
@@ -314,7 +319,13 @@ void SendUDPBroadCast()
     messageInfo.mPeerPort = 23367;
     otMessageAppend(message, domainName, static_cast<uint16_t>(strlen(domainName)));
 
-    otUdpSend(ThreadStackMgrImpl().OTInstance(), &mSocket, message, &messageInfo);
+    error = otUdpSend(ThreadStackMgrImpl().OTInstance(), &mSocket, message, &messageInfo);
+    
+    if (error != OT_ERROR_NONE && message != nullptr)
+    {
+        otMessageFree(message);
+        NRF_LOG_INFO("Failed to otUdpSend: %d", error);
+    }
     ThreadStackMgrImpl().UnlockThreadStack();
 }
 
@@ -397,6 +408,9 @@ void AppTask::AppTaskMain(void * pvParameter)
         sLockLED.Animate();
         sUnusedLED.Animate();
         sUnusedLED_1.Animate();
+
+        sLockStatusLED.Set(!BoltLockMgr().IsUnlocked());
+        sLockStatusLED.Animate();
 
         uint64_t nowUS            = chip::System::Platform::Layer::GetClock_Monotonic();
         uint64_t nextChangeTimeUS = mLastChangeTimeUS + 5 * 1000 * 1000UL;
