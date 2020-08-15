@@ -111,7 +111,7 @@ int AppTask::Init()
     sLockLED.Set(!BoltLockMgr().IsUnlocked());
 
     sLockStatusLED.Init(LOCK_STATE_LED_GPIO);
-    sLockStatusLED.Set(!BoltLockMgr().IsUnlocked());
+    sLockStatusLED.Set(BoltLockMgr().IsUnlocked());
 
     sUnusedLED.Init(BSP_LED_2);
     sUnusedLED_1.Init(BSP_LED_3);
@@ -320,7 +320,7 @@ void SendUDPBroadCast()
     otMessageAppend(message, domainName, static_cast<uint16_t>(strlen(domainName)));
 
     error = otUdpSend(ThreadStackMgrImpl().OTInstance(), &mSocket, message, &messageInfo);
-    
+
     if (error != OT_ERROR_NONE && message != nullptr)
     {
         otMessageFree(message);
@@ -409,7 +409,7 @@ void AppTask::AppTaskMain(void * pvParameter)
         sUnusedLED.Animate();
         sUnusedLED_1.Animate();
 
-        sLockStatusLED.Set(!BoltLockMgr().IsUnlocked());
+        sLockStatusLED.Set(BoltLockMgr().IsUnlocked());
         sLockStatusLED.Animate();
 
         uint64_t nowUS            = chip::System::Platform::Layer::GetClock_Monotonic();
