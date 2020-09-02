@@ -16,7 +16,7 @@
  *
  */
 
-package com.google.chip.chiptool.commissioner;
+package com.google.chip.chiptool.commissioner.thread.internal;
 
 import android.content.Context;
 import android.view.LayoutInflater;
@@ -25,11 +25,12 @@ import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.TextView;
 import com.google.chip.chiptool.R;
+import com.google.chip.chiptool.commissioner.thread.ThreadNetworkInfo;
 import java.util.Arrays;
 import java.util.Vector;
 
-public class NetworkAdapter extends BaseAdapter {
-  private Vector<NetworkInfo> networks;
+class NetworkAdapter extends BaseAdapter {
+  private Vector<ThreadNetworkInfo> networks;
 
   private LayoutInflater inflater;
 
@@ -38,11 +39,10 @@ public class NetworkAdapter extends BaseAdapter {
     networks = new Vector<>();
   }
 
-  public boolean addNetwork(NetworkInfo newNetwork) {
-    for (NetworkInfo network : networks) {
-      if (network.getNetworkName().equals(newNetwork.getNetworkName())
-          && Arrays.equals(network.getExtendedPanId(), newNetwork.getExtendedPanId())) {
-        network.merge(newNetwork);
+  public boolean addNetwork(ThreadNetworkInfo newNetwork) {
+    for (ThreadNetworkInfo network : networks) {
+      if (network.networkName.equals(newNetwork.networkName)
+          && Arrays.equals(network.extendedPanId, newNetwork.extendedPanId)) {
         return false;
       }
     }
@@ -73,7 +73,7 @@ public class NetworkAdapter extends BaseAdapter {
       convertView = inflater.inflate(R.layout.commissioner_network_list_item, container, false);
     }
     TextView networkNameText = convertView.findViewById(R.id.network_name);
-    networkNameText.setText(networks.get(position).getNetworkName());
+    networkNameText.setText(networks.get(position).networkName);
     return convertView;
   }
 }

@@ -29,7 +29,7 @@ cd "${CUR_DIR}"
 
 mkdir -p build && cd build
 cmake -GNinja                                                                               \
-    -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK_HOME}"/build/cmake/android.toolchain.cmake \
+    -DCMAKE_TOOLCHAIN_FILE="${ANDROID_NDK_HOME}"/build/cmake/android.toolchain.cmake        \
     -DANDROID_ABI="${ABI}"                                                                  \
     -DANDROID_ARM_NEON=ON                                                                   \
     -DANDROID_NATIVE_API_LEVEL="${API}"                                                     \
@@ -41,7 +41,7 @@ cmake -GNinja                                                                   
     -DOT_COMM_JAVA_BINDING=ON                                                               \
     -DOT_COMM_APP=OFF                                                                       \
     -DOT_COMM_TEST=OFF                                                                      \
-    -DOT_COMM_CCM=OFF                                                                \
+    -DOT_COMM_CCM=OFF                                                                       \
     ../repo
 
 ninja

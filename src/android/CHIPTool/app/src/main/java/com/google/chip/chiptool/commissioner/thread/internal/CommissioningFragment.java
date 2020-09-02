@@ -16,7 +16,7 @@
  *
  */
 
-package com.google.chip.chiptool.commissioner;
+package com.google.chip.chiptool.commissioner.thread.internal;
 
 import android.app.Activity;
 import android.os.Bundle;
@@ -37,15 +37,18 @@ import androidx.work.WorkInfo;
 import androidx.work.WorkManager;
 import androidx.work.WorkRequest;
 import com.google.chip.chiptool.R;
+import com.google.chip.chiptool.commissioner.CommissionerActivity;
+import com.google.chip.chiptool.commissioner.thread.ThreadNetworkInfo;
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo;
 import com.google.gson.Gson;
 
-public class CommissioningFragment extends Fragment implements Observer<WorkInfo> {
+class CommissioningFragment extends Fragment implements Observer<WorkInfo> {
 
   private static final String TAG = CommissioningFragment.class.getSimpleName();
 
   private CHIPDeviceInfo deviceInfo;
-  private NetworkInfo networkInfo;
+  private ThreadNetworkInfo threadNetworkInfo;
+  private byte[] pskc;
 
   WorkRequest commssionerWorkRequest;
 
@@ -55,6 +58,12 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
   Button doneButton;
   ImageView doneImage;
   ImageView errorImage;
+
+  public CommissioningFragment(CHIPDeviceInfo deviceInfo, ThreadNetworkInfo threadNetworkInfo, byte[] pskc) {
+    this.deviceInfo = deviceInfo;
+    this.threadNetworkInfo = threadNetworkInfo;
+    this.pskc = pskc;
+  }
 
   @Override
   public View onCreateView(
@@ -75,16 +84,14 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
     progressBar.setMin(0);
     progressBar.setMax(100);
 
-    deviceInfo = getArguments().getParcelable(Constants.KEY_DEVICE_INFO);
-    networkInfo = getArguments().getParcelable(Constants.KEY_NETWORK_INFO);
-
     Data arguments =
         new Data.Builder()
             .putString(Constants.KEY_DEVICE_INFO, new Gson().toJson(deviceInfo))
-            .putString(Constants.KEY_NETWORK_INFO, new Gson().toJson(networkInfo))
+            .putString(Constants.KEY_NETWORK_INFO, new Gson().toJson(threadNetworkInfo))
+            .putString(Constants.KEY_PSKC, new Gson().toJson(pskc))
             .build();
-    commssionerWorkRequest =
-        new OneTimeWorkRequest.Builder(CommissionerWorker.class).setInputData(arguments).build();
+    // TODO:
+    commssionerWorkRequest = null; // new OneTimeWorkRequest.Builder(CommissionerWorker.class).setInputData(arguments).build();
 
     WorkManager.getInstance(getActivity()).enqueue(commssionerWorkRequest);
 
@@ -94,25 +101,19 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
 
     view.findViewById(R.id.cancel_button)
         .setOnClickListener(
-            new View.OnClickListener() {
-              @Override
-              public void onClick(View view) {
-                WorkManager.getInstance(getActivity())
-                    .cancelWorkById(commssionerWorkRequest.getId());
+            v -> {
+              WorkManager.getInstance(getActivity())
+                  .cancelWorkById(commssionerWorkRequest.getId());
 
-                CommissionerActivity commissionerActivity = (CommissionerActivity) getActivity();
-                commissionerActivity.finishCommissioning(Activity.RESULT_CANCELED);
-              }
+              CommissionerActivity commissionerActivity = (CommissionerActivity) getActivity();
+              commissionerActivity.finishCommissioning(Activity.RESULT_CANCELED);
             });
 
     view.findViewById(R.id.done_button)
         .setOnClickListener(
-            new View.OnClickListener() {
-              @Override
-              public void onClick(View view) {
-                CommissionerActivity commissionerActivity = (CommissionerActivity) getActivity();
-                commissionerActivity.finishCommissioning(Activity.RESULT_OK);
-              }
+            v -> {
+              CommissionerActivity commissionerActivity = (CommissionerActivity) getActivity();
+              commissionerActivity.finishCommissioning(Activity.RESULT_OK);
             });
   }
 

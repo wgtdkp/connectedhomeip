@@ -1,43 +1,61 @@
-/*
- *   Copyright (c) 2020 Project CHIP Authors
- *   All rights reserved.
- *
- *   Licensed under the Apache License, Version 2.0 (the "License");
- *   you may not use this file except in compliance with the License.
- *   You may obtain a copy of the License at
- *
- *       http://www.apache.org/licenses/LICENSE-2.0
- *
- *   Unless required by applicable law or agreed to in writing, software
- *   distributed under the License is distributed on an "AS IS" BASIS,
- *   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- *   See the License for the specific language governing permissions and
- *   limitations under the License.
- *
- */
+package com.google.chip.chiptool.commissioner.thread.internal;
 
-package com.google.chip.chiptool.commissioner;
-
-import android.content.Context;
 import android.util.Log;
 import androidx.annotation.NonNull;
-import androidx.work.Data;
-import androidx.work.Worker;
-import androidx.work.WorkerParameters;
-import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo;
-import com.google.gson.Gson;
+import com.google.chip.chiptool.commissioner.thread.BorderAgentInfo;
+import com.google.chip.chiptool.commissioner.thread.CommissionerUtils;
+import com.google.chip.chiptool.commissioner.thread.ThreadCommissionerException;
+import com.google.chip.chiptool.commissioner.thread.ThreadNetworkCredential;
+import io.openthread.commissioner.ActiveOperationalDataset;
 import io.openthread.commissioner.ByteArray;
 import io.openthread.commissioner.ChannelMask;
 import io.openthread.commissioner.Commissioner;
-import io.openthread.commissioner.CommissionerDataset;
 import io.openthread.commissioner.CommissionerHandler;
 import io.openthread.commissioner.Config;
 import io.openthread.commissioner.Error;
 import io.openthread.commissioner.ErrorCode;
 import io.openthread.commissioner.LogLevel;
 import io.openthread.commissioner.Logger;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.net.InetAddress;
+
+class NetworkCredentialFetcher {
+
+  private static final String TAG = NetworkCredentialFetcher.class.getSimpleName();
+
+  public ThreadNetworkCredential fetchNetworkCredential(@NonNull BorderAgentInfo borderAgentInfo, @NonNull byte[] pskc) throws ThreadCommissionerException {
+    ActiveOperationalDataset activeOperationalDataset = fetchNetworkCredential(borderAgentInfo.host, borderAgentInfo.port, pskc);
+    return new ThreadNetworkCredential(CommissionerUtils.getByteArray(activeOperationalDataset.getRawTlvs()));
+  }
+
+  private ActiveOperationalDataset fetchNetworkCredential(@NonNull InetAddress address, int port, @NonNull byte[] pskc) throws ThreadCommissionerException {
+    Commissioner nativeCommissioner = Commissioner.create(new NativeCommissionerHandler());
+
+    Config config = new Config();
+    config.setId("TestComm");
+    config.setDomainName("TestDomain");
+    config.setEnableCcm(false);
+    config.setPSKc(CommissionerUtils.getByteArray(pskc));
+    config.setLogger(new NativeCommissionerLogger());
+
+    // Initialize the native commissioner
+    throwIfFail(nativeCommissioner.init(config));
+
+    // Petition to be the active commissioner in the Thread Network.
+    String[] existingCommissionerId = new String[1];
+    throwIfFail(nativeCommissioner.petition(existingCommissionerId, address.getHostAddress(), port));
+
+    // Fetch Active Operational Dataset.
+    ActiveOperationalDataset activeOperationalDataset = new ActiveOperationalDataset();
+    throwIfFail(nativeCommissioner.getActiveDataset(activeOperationalDataset, 0xFFFF));
+    nativeCommissioner.resign();
+
+    return activeOperationalDataset;
+  }
+
+  private void throwIfFail(Error error) throws ThreadCommissionerException {
+    throw new ThreadCommissionerException(error.getCode().swigValue(), error.getMessage());
+  }
+}
 
 class NativeCommissionerLogger extends Logger {
   private static final String TAG = "NativeCommissioner";
@@ -49,18 +67,12 @@ class NativeCommissionerLogger extends Logger {
 }
 
 class NativeCommissionerHandler extends CommissionerHandler {
-  private static final String TAG = "NativeCommissioner";
-
-  private CommissionerWorker commissionerWorker;
-
-  NativeCommissionerHandler(CommissionerWorker commissionerWorker) {
-    this.commissionerWorker = commissionerWorker;
-  }
+  private static final String TAG = NativeCommissionerHandler.class.getSimpleName();
 
   @Override
   public String onJoinerRequest(ByteArray joinerId) {
     Log.d(TAG, "A joiner is requesting commissioning");
-    return commissionerWorker.getPskd();
+    return "";
   }
 
   @Override
@@ -78,7 +90,6 @@ class NativeCommissionerHandler extends CommissionerHandler {
       String provisioningUrl,
       ByteArray vendorData) {
     Log.d(TAG, "A joiner is finalizing");
-    commissionerWorker.onJoinerFinalize(joinerId);
     return true;
   }
 
@@ -103,14 +114,14 @@ class NativeCommissionerHandler extends CommissionerHandler {
   }
 }
 
-public class CommissionerWorker extends Worker {
+/*
+class CommissionerWorker extends Worker {
 
   private static final String TAG = CommissionerWorker.class.getSimpleName();
 
   private CHIPDeviceInfo deviceInfo;
-  private NetworkInfo networkInfo;
-
-  private AtomicBoolean curJoinerCommissioned = new AtomicBoolean(false);
+  private ThreadNetworkInfo threadNetworkInfo;
+  private byte[] pskc;
 
   private static Commissioner nativeCommissioner;
 
@@ -120,23 +131,18 @@ public class CommissionerWorker extends Worker {
     deviceInfo =
         new Gson()
             .fromJson(getInputData().getString(Constants.KEY_DEVICE_INFO), CHIPDeviceInfo.class);
-    networkInfo =
+    threadNetworkInfo =
         new Gson()
-            .fromJson(getInputData().getString(Constants.KEY_NETWORK_INFO), NetworkInfo.class);
+            .fromJson(getInputData().getString(Constants.KEY_NETWORK_INFO), ThreadNetworkInfo.class);
+    pskc = new Gson().fromJson(getInputData().getString(Constants.KEY_PSKC), byte[].class);
 
     nativeCommissioner = Commissioner.create(new NativeCommissionerHandler(this));
 
-    ByteArray pskc =
-        new ByteArray(
-            new short[] {
-              0x3a, 0xa5, 0x5f, 0x91, 0xca, 0x47, 0xd1, 0xe4, 0xe7, 0x1a, 0x08, 0xcb, 0x35, 0xe9,
-              0x15, 0x91
-            });
     Config config = new Config();
     config.setId("TestComm");
     config.setDomainName("TestDomain");
     config.setEnableCcm(false);
-    config.setPSKc(pskc);
+    config.setPSKc(CommissionerUtils.getByteArray(pskc));
     config.setLogger(new NativeCommissionerLogger());
 
     nativeCommissioner.init(config);
@@ -146,79 +152,39 @@ public class CommissionerWorker extends Worker {
     return String.format("%09u", deviceInfo.getSetupPinCode());
   }
 
-  private ByteArray getJoinerId() {
-    int productId = deviceInfo.getProductId();
-    return new ByteArray(
-        new short[] {
-          0x00,
-          0x00,
-          0x00,
-          0x00,
-          (short) (productId >> 24),
-          (short) (productId >> 16),
-          (short) (productId >> 8),
-          (short) (productId & 0xff)
-        });
-  }
-
   @NonNull
   @Override
   public Result doWork() {
-    setProgressAsync(StateToData("commissioning..."));
-
     if (nativeCommissioner != null) {
       nativeCommissioner.resign();
     }
 
-    // Error error = nativeCommissioner.init(config);
-    // if (error.getCode() != ErrorCode.kNone) {
-    //    return errorToResult(error);
-    // }
+    setProgressAsync(StateToData("petitioning..."));
 
     String[] existingCommissionerId = new String[1];
     Error error =
         nativeCommissioner.petition(
-            existingCommissionerId, networkInfo.getHost().getHostAddress(), networkInfo.getPort());
+            existingCommissionerId, threadNetworkInfo.getHost().getHostAddress(), threadNetworkInfo.getPort());
     if (error.getCode() != ErrorCode.kNone) {
       return errorToResult(error);
+    }
+
+    // Store the PSKc after successfully connecting to the current Border Agent.
+    ThreadNetworkCredential networkCredential = new ThreadNetworkCredential(threadNetworkInfo.getNetworkName(), threadNetworkInfo
+        .getExtendedPanId(), pskc, null);
+    try {
+      NetworkCredentialDatabase.getDatabase(getApplicationContext()).insertNetworkCredential(networkCredential);
+    } catch (ExecutionException e) {
+      e.printStackTrace();
+    } catch (InterruptedException e) {
+      e.printStackTrace();
     }
 
     setProgressAsync(StateToData("commissioner connected"));
 
-    curJoinerCommissioned.set(false);
-
-    ByteArray steeringData = new ByteArray(new short[] {0xFF});
-    // Commissioner.addJoiner(steeringData, getJoinerId());
-    CommissionerDataset commDataset = new CommissionerDataset();
-    commDataset.setSteeringData(steeringData);
-    commDataset.setPresentFlags(
-        commDataset.getPresentFlags() | CommissionerDataset.kSteeringDataBit);
-
-    error = nativeCommissioner.setCommissionerDataset(commDataset);
-    if (error.getCode() != ErrorCode.kNone) {
-      nativeCommissioner.resign();
-      return errorToResult(error);
-    }
-
-    setProgressAsync(StateToData("waiting for new device...\nPSKD: " + getPskd()));
-
-    // Wait 200 seconds for a joiner.
-    for (int i = 0; i < 200; ++i) {
-      if (curJoinerCommissioned.get()) {
-        break;
-      }
-
-      try {
-        TimeUnit.SECONDS.sleep(1);
-      } catch (InterruptedException e) {
-        Log.d(TAG, "interrupted exception");
-      }
-    }
-
-    if (!curJoinerCommissioned.get()) {
-      nativeCommissioner.resign();
-      return errorToResult(new Error(ErrorCode.kTimeout, "No joiner is pairing"));
-    }
+    // TODO(wgtdkp): get active operational dataset
+    //ActiveOperationalDataset
+    //nativeCommissioner.getActiveDataset();
 
     nativeCommissioner.resign();
 
@@ -249,8 +215,5 @@ public class CommissionerWorker extends Worker {
   private Data StateToData(String state) {
     return new Data.Builder().putString(Constants.KEY_COMMISSIONING_STATUS, state).build();
   }
-
-  public void onJoinerFinalize(ByteArray joinerId) {
-    curJoinerCommissioned.set(true);
-  }
 }
+*/
