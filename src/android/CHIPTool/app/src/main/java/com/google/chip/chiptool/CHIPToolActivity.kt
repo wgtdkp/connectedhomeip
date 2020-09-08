@@ -17,16 +17,19 @@
  */
 package com.google.chip.chiptool
 
+import android.app.Activity
 import android.content.Intent
+import android.net.VpnService
 import android.os.Bundle
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.Fragment
+import com.google.chip.chiptool.clusterclient.OnOffClientFragment
 import com.google.chip.chiptool.commissioner.CommissionerActivity
 import com.google.chip.chiptool.echoclient.EchoClientFragment
-import com.google.chip.chiptool.clusterclient.OnOffClientFragment
 import com.google.chip.chiptool.setuppayloadscanner.BarcodeFragment
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceDetailsFragment
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo
+import io.openthread.toble.TobleService
 
 class CHIPToolActivity :
     AppCompatActivity(),
@@ -44,6 +47,8 @@ class CHIPToolActivity :
           .add(R.id.fragment_container, fragment, fragment.javaClass.simpleName)
           .commit()
     }
+
+    startTobleService();
   }
 
   override fun onCHIPDeviceInfoReceived(deviceInfo: CHIPDeviceInfo) {
@@ -70,9 +75,17 @@ class CHIPToolActivity :
   override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
     super.onActivityResult(requestCode, resultCode, data)
 
-    // Simply ignore the commissioning result.
-
-    // TODO: tracking commissioned devices.
+    if (requestCode == REQUEST_CODE_COMMISSIONING) {
+      // Simply ignore the commissioning result.
+      // TODO: tracking commissioned devices.
+    } else if (requestCode == REQUEST_CODE_START_TOBLE) {
+      if (resultCode == Activity.RESULT_OK) {
+        var intent = Intent(this, TobleService::class.java)
+        intent.setAction(TobleService.ACTION_START)
+        intent.putExtra(TobleService.KEY_PEER_ADDR, "fe80:0:0:0:f3d9:2a82:c8d8:fe43")
+        startService(intent)
+      }
+    }
   }
 
   private fun showFragment(fragment: Fragment) {
@@ -83,7 +96,18 @@ class CHIPToolActivity :
         .commit()
   }
 
+  private fun startTobleService() {
+    // Start ToBLE service.
+    var intent = VpnService.prepare(this)
+    if (intent != null) {
+      startActivityForResult(intent, REQUEST_CODE_START_TOBLE)
+    } else {
+      onActivityResult(REQUEST_CODE_START_TOBLE, Activity.RESULT_OK, null)
+    }
+  }
+
   companion object {
     var REQUEST_CODE_COMMISSIONING = 0xB003
+    var REQUEST_CODE_START_TOBLE = 0xB004
   }
 }

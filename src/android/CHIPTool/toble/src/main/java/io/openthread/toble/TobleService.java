@@ -1,77 +1,156 @@
 package io.openthread.toble;
 
+import android.content.Intent;
+import android.net.VpnService;
+import android.os.ParcelFileDescriptor;
 import android.util.Log;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
 import java.net.Inet6Address;
-import java.util.concurrent.Callable;
+import java.net.InetAddress;
+import java.net.UnknownHostException;
 
 /**
- * This class implements the ToBLE service which sends IP packets over BLE link.
+ * This class implements the ToBLE VPN service that creates a dedicated TUN interface
+ * and send/receive IP packets to/from ToBLE.
  *
  */
-public class TobleService extends TobleCallbacks {
+public class TobleService extends VpnService {
 
-  private static final String TAG = TobleService.class.getSimpleName();
+  private static final String  TAG = TobleService.class.getSimpleName();
 
-  private TobleVpnService vpnService;
-  private Toble toble;
-  private TobleDriverImpl tobleDriver;
+  public static final String ACTION_START = "io.openthread.toble.TobleService.START";
+  public static final String ACTION_STOP = "io.openthread.toble.TobleService.STOP";
+  public static final String KEY_LOCAL_ADDR = "local_addr";
+  public static final String KEY_PEER_ADDR = "peer_addr";
+
+  /** Maximum packet size is constrained by the MTU, which is given as a signed short. */
+  private static final int MAX_PACKET_SIZE = 1024;
+
+  private Toble toble = Toble.getInstance();
+  private TobleHandler tobleHandler = new TobleHandler();
+  private TobleDriverImpl tobleDriver = new TobleDriverImpl();
+
   private Thread thread;
 
-  private static final TobleService instance = new TobleService();
-
-  private TobleService() {
-    toble = Toble.getInstance();
-    tobleDriver = new TobleDriverImpl();
-  }
-
-  public static TobleService getInstance() {
-    return instance;
-  }
-
-  public void start(Inet6Address peerDeviceAddr) {
-    if (isRunning()) {
-      Log.e(TAG, "TobleService is already running");
-      return;
+  @Override
+  public int onStartCommand(Intent intent, int flags, int startId) {
+    if (intent == null) {
+      return START_NOT_STICKY;
     }
 
-    toble.init(tobleDriver);
-    vpnService = new TobleVpnService(peerDeviceAddr);
-    vpnService.start();
+    if (ACTION_STOP.equals(intent.getAction())) {
+      stop();
+      return START_NOT_STICKY;
+    } else {
+      try {
+        Inet6Address peerAddr = (Inet6Address) InetAddress.getByName(intent.getExtras().getString(KEY_PEER_ADDR));
 
-    thread = new Thread(() -> {
-      // TODO(wgtdkp):
-      long timeout = toble.process();
-    });
-
-    thread.start();
-
-    // TODO(wgtdkp): run the ToBLE stack in a dedicated Thread.
-  }
-
-  public void stop() {
-    if (!isRunning()) {
-      Log.e(TAG, "TobleService has already been stopped");
-      return;
+        start(peerAddr);
+      } catch (UnknownHostException e) {
+        e.printStackTrace();
+      }
+      return START_STICKY;
     }
-
-    thread.interrupt();
-    thread = null;
-
-    vpnService.stop();
-    toble.deinit();
-  }
-
-  public void postTask(Callable<Void> task) {
-
-  }
-
-  private boolean isRunning() {
-    return thread != null;
   }
 
   @Override
-  public void onIp6Receive(SWIGTYPE_p_unsigned_char aPacket, long aPacketLength) {
-    Log.d(TAG, "::onIp6Receive");
+  public void onDestroy() {
+    stop();
+    super.onDestroy();
+  }
 
+  private void start(Inet6Address peerAddr) {
+    if (isRunning()) {
+      Log.w(TAG, "The VPN service is already running");
+      return;
+    }
+
+    String localAddrStr = toble.init(tobleHandler, tobleDriver);
+
+    Log.d(TAG, "init with link local address: " + localAddrStr);
+
+    thread = new Thread(() -> {
+      long timeout = 0;
+
+      Inet6Address localAddr = null;
+      try {
+        localAddr = (Inet6Address) Inet6Address.getByName(localAddrStr);
+      } catch (UnknownHostException e) {
+        e.printStackTrace();
+      }
+
+      // Configure the TUN and get the interface.
+      ParcelFileDescriptor tunInterface = new Builder().setSession("MyVPNService")
+          .addAddress(localAddr, 128)
+          .addRoute(peerAddr, 128)
+          .setBlocking(false)
+          .establish();
+
+      // Packets to be sent are queued in this input stream.
+      FileInputStream in = new FileInputStream(
+          tunInterface.getFileDescriptor());
+
+      // Packets received need to be written to this output stream.
+      FileOutputStream out = new FileOutputStream(
+          tunInterface.getFileDescriptor());
+
+      byte[] packet = new byte[MAX_PACKET_SIZE];
+
+      try {
+        while (true) {
+          // Read the outgoing packet from the input stream.
+          int length = in.read(packet);
+
+          if (length > 0) {
+            // TODO(wgtdkp): logging the packet
+            Log.d(TAG, String.format("sending packet via ToBLE: %s", TobleUtils.getHexString(packet, length)));
+
+            otError error = toble.ip6Send(TobleUtils.getByteArray(packet, length).cast(), length);
+            if (!error.equals(otError.OT_ERROR_NONE)) {
+              Log.e(TAG, "sending packets to ToBLE failed");
+            }
+          }
+
+          timeout = toble.process();
+        }
+      } catch (Exception e) {
+        Log.e(TAG, "Cannot use socket", e);
+      } finally {
+        if (tunInterface != null) {
+          try {
+            tunInterface.close();
+          } catch (IOException e) {
+            e.printStackTrace();
+          }
+        }
+      }
+    });
+
+    thread.start();
+  }
+
+  private void stop() {
+    if (thread != null) {
+      thread.interrupt();
+      thread = null;
+    }
+  }
+
+  public boolean isRunning() {
+    return thread != null;
+  }
+
+  private void receivePacketFromToble(byte[] packet) {
+    Log.d(TAG, String.format("received packet from ToBLE: %s", TobleUtils.getHexString(packet, packet.length)));
+  }
+
+  class TobleHandler extends TobleCallbacks {
+    @Override
+    public void onIp6Receive(SWIGTYPE_p_unsigned_char aPacket, long aPacketLength) {
+      ByteArray packet = ByteArray.frompointer(aPacket);
+      receivePacketFromToble(TobleUtils.getByteArray(packet, (int)aPacketLength));
+    }
   }
 }
