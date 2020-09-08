@@ -2,6 +2,7 @@ package io.openthread.toble;
 
 import android.util.Log;
 import java.net.Inet6Address;
+import java.util.concurrent.Callable;
 
 /**
  * This class implements the ToBLE service which sends IP packets over BLE link.
@@ -39,7 +40,7 @@ public class TobleService extends TobleCallbacks {
 
     thread = new Thread(() -> {
       // TODO(wgtdkp):
-      toble.process();
+      long timeout = toble.process();
     });
 
     thread.start();
@@ -60,9 +61,9 @@ public class TobleService extends TobleCallbacks {
     toble.deinit();
   }
 
-  //public void postTask(Runnable<Void> task) {
-  //
-  //}
+  public void postTask(Callable<Void> task) {
+
+  }
 
   private boolean isRunning() {
     return thread != null;
