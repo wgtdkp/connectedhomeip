@@ -11,12 +11,16 @@ import java.net.Inet6Address;
 import java.net.InetAddress;
 import java.net.UnknownHostException;
 
+interface TobleRunner {
+  void postTask(Runnable task);
+}
+
 /**
  * This class implements the ToBLE VPN service that creates a dedicated TUN interface
  * and send/receive IP packets to/from ToBLE.
  *
  */
-public class TobleService extends VpnService {
+public class TobleService extends VpnService implements TobleRunner {
 
   private static final String  TAG = TobleService.class.getSimpleName();
 
@@ -30,7 +34,7 @@ public class TobleService extends VpnService {
 
   private Toble toble = Toble.getInstance();
   private TobleHandler tobleHandler = new TobleHandler();
-  private TobleDriverImpl tobleDriver = new TobleDriverImpl();
+  private TobleDriverImpl tobleDriver = new TobleDriverImpl(getApplicationContext(), this);
 
   private Thread thread;
 
@@ -104,7 +108,6 @@ public class TobleService extends VpnService {
           int length = in.read(packet);
 
           if (length > 0) {
-            // TODO(wgtdkp): logging the packet
             Log.d(TAG, String.format("sending packet via ToBLE: %s", TobleUtils.getHexString(packet, length)));
 
             otError error = toble.ip6Send(TobleUtils.getByteArray(packet, length).cast(), length);
@@ -144,6 +147,11 @@ public class TobleService extends VpnService {
 
   private void receivePacketFromToble(byte[] packet) {
     Log.d(TAG, String.format("received packet from ToBLE: %s", TobleUtils.getHexString(packet, packet.length)));
+  }
+
+  @Override
+  public void postTask(Runnable task) {
+    // TODO(wgtdkp):
   }
 
   class TobleHandler extends TobleCallbacks {

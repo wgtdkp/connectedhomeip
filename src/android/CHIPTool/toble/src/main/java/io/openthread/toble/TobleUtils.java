@@ -1,5 +1,7 @@
 package io.openthread.toble;
 
+import java.util.Locale;
+
 class TobleUtils {
 
   public static ByteArray getByteArray(byte[] bytes) {
@@ -22,6 +24,14 @@ class TobleUtils {
     return result;
   }
 
+  public static byte[] getByteArray(short[] bytes) {
+    byte[] result = new byte[bytes.length];
+    for (int i  = 0; i < bytes.length; ++i) {
+      result[i] = (byte) (bytes[i] & 0xff);
+    }
+    return result;
+  }
+
   public static String getHexString(byte[] bytes) {
     return getHexString(bytes, bytes.length);
   }
@@ -32,5 +42,18 @@ class TobleUtils {
       builder.append(String.format("%02X", bytes[i]));
     }
     return builder.toString();
+  }
+
+  public static String tobleAddrToString(otTobleAddress tobleAddr) {
+    byte[] addr = getByteArray(tobleAddr.getAddress());
+    return  String.format("%02X:%02X:%02X:%02X:%02X:%02X", addr[0], addr[1],
+                          addr[2], addr[3], addr[4], addr[5]);
+  }
+
+  public static otTobleAddress tobleAddrFromString(String addr) {
+    otTobleAddress tobleAddr = new otTobleAddress();
+    byte[] buf = new byte[6];
+    
+
   }
 }
