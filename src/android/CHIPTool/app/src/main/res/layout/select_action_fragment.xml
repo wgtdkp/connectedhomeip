@@ -43,7 +43,7 @@
         android:layout_alignParentTop="true"
         android:inputType="text"
         android:textSize="20sp"
-        android:text="fe80:0:0:0:fc8a:ccc4:63a7:6aea"/>
+        android:text="fe80:0:0:0:14fc:8601:eb1c:685a"/>
 
     <Button
         android:id="@+id/startTobleServiceBtn"

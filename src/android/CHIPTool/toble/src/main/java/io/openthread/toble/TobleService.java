@@ -167,11 +167,18 @@ public class TobleService extends VpnService implements TobleRunner {
   }
 
   private void receivePacketFromToble(byte[] packet) {
-    Log.d(TAG, String.format("received packet from ToBLE: %s", TobleUtils.getHexString(packet, packet.length)));
-    try {
-      outputStream.write(packet);
-    } catch (IOException e) {
-      e.printStackTrace();
+    if (isRunning.get()) {
+      postTask(() -> {
+        try {
+          outputStream.write(packet);
+          Log.d(TAG, String.format("received packet from ToBLE: %s",
+              TobleUtils.getHexString(packet, packet.length)));
+        } catch (IOException e) {
+          e.printStackTrace();
+        }
+      });
+    } else {
+      Log.e(TAG, "serivce is down, dropping packet");
     }
   }
 

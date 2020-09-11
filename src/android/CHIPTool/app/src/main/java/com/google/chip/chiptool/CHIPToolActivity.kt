@@ -102,7 +102,7 @@ class CHIPToolActivity :
         var socket: DatagramSocket? = null
         try {
           val hello = "hello".toByteArray()
-          socket = DatagramSocket()
+          socket = DatagramSocket(11095)
           //socket.connect( InetAddress.getByName(ThreadVpnService.LOCAL_ADDR), 6666);
           // We cannot use the address (2001:1983::de8) assigned to the TUN interface.
           socket.connect(InetAddress.getByName(remoteIp + "%tun0"), TEST_REMOTE_DEVICE_PORT)
@@ -177,6 +177,6 @@ class CHIPToolActivity :
     var REQUEST_CODE_COMMISSIONING = 0xB003
     var REQUEST_CODE_START_TOBLE = 0xB004
     // var TEST_REMOTE_DEVICE_IP = "fe80:0:0:0:1872:d5f4:559:3659" // "1983::2001:de8"
-    var TEST_REMOTE_DEVICE_PORT = 1234
+    var TEST_REMOTE_DEVICE_PORT = 11095
   }
 }
