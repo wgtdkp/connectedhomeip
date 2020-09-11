@@ -35,4 +35,37 @@
         android:layout_marginTop="8dp"
         android:text="@string/on_off_btn_text" />
 
+    <EditText
+        android:id="@+id/remoteIpAddressEd"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_margin="16dp"
+        android:layout_alignParentTop="true"
+        android:inputType="text"
+        android:textSize="20sp"
+        android:text="fe80:0:0:0:14fc:8601:eb1c:685a"/>
+
+    <Button
+        android:id="@+id/startTobleServiceBtn"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:text="Start IPoBLE Service" />
+
+    <Button
+        android:id="@+id/stopTobleServiceBtn"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:text="Stop IPoBLE Service" />
+
+    <Button
+        android:id="@+id/sendUdpBtn"
+        android:layout_height="wrap_content"
+        android:layout_width="wrap_content"
+        android:layout_marginStart="8dp"
+        android:layout_marginTop="8dp"
+        android:text="Send Udp" />
 </LinearLayout>

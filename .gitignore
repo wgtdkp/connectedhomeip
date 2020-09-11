@@ -63,3 +63,7 @@ TAGS
 # Python bytecodes
 __pycache__
 *.pyc
+
+build
+*.so
+*.jar

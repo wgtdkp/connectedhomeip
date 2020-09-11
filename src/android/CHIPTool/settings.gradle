@@ -1,2 +1,3 @@
+include ':toble'
 include ':app'
 rootProject.name = "CHIPTool"

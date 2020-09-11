@@ -11,7 +11,7 @@
         android:layout_alignParentTop="true"
         android:inputType="text"
         android:textSize="20sp"
-        android:hint="@string/enter_ip_address_hint_text"/>
+        android:text="fe80:0:0:0:14fc:8601:eb1c:685a" />
 
     <TextView
         android:id="@+id/onBtn"

@@ -88,6 +88,8 @@ CHIP_ERROR UDP::SendMessage(const MessageHeader & header, const Transport::PeerA
     size_t actualEncodedHeaderSize;
     CHIP_ERROR err = CHIP_NO_ERROR;
 
+    Inet::InterfaceId tunInterface = 0;
+
     VerifyOrExit(address.GetTransportType() == Type::kUdp, err = CHIP_ERROR_INVALID_ARGUMENT);
     VerifyOrExit(mState == State::kInitialized, err = CHIP_ERROR_INCORRECT_STATE);
     VerifyOrExit(mUDPEndPoint != nullptr, err = CHIP_ERROR_INCORRECT_STATE);
@@ -97,6 +99,11 @@ CHIP_ERROR UDP::SendMessage(const MessageHeader & header, const Transport::PeerA
 
     addrInfo.DestAddress = address.GetIPAddress();
     addrInfo.DestPort    = address.GetPort();
+
+    if (Inet::InterfaceNameToId("tun0", tunInterface) != CHIP_NO_ERROR) {
+        fputs("Error: Invalid interface: tun0", stderr);
+    }
+    addrInfo.Interface   = tunInterface;
 
     VerifyOrExit(msgBuf->EnsureReservedSize(headerSize), err = CHIP_ERROR_NO_MEMORY);
 

@@ -38,6 +38,10 @@ class SelectActionFragment : Fragment() {
       commissioningBtn.setOnClickListener { getCallback()?.handleCommissioningClicked() }
       echoClientBtn.setOnClickListener { getCallback()?.handleEchoClientClicked() }
       onOffClusterBtn.setOnClickListener { getCallback()?.handleOnOffClicked() }
+
+      startTobleServiceBtn.setOnClickListener { getCallback()?.handleStartTobleServiceClicked() }
+      stopTobleServiceBtn.setOnClickListener { getCallback()?.handleStopTobleServiceClicked() }
+      sendUdpBtn.setOnClickListener { getCallback()?.handleSendUdpClicked() }
     }
   }
 
@@ -53,6 +57,10 @@ class SelectActionFragment : Fragment() {
     fun handleEchoClientClicked()
     /** Notifies listener of send command button click. */
     fun handleOnOffClicked()
+
+    fun handleStartTobleServiceClicked()
+    fun handleStopTobleServiceClicked()
+    fun handleSendUdpClicked()
   }
 
   companion object {
