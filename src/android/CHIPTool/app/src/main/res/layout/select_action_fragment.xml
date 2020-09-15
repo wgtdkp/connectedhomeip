@@ -36,14 +36,14 @@
         android:text="@string/on_off_btn_text" />
 
     <EditText
-        android:id="@+id/remoteIpAddressEd"
+        android:id="@+id/remoteBleAddressEd"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_margin="16dp"
         android:layout_alignParentTop="true"
         android:inputType="text"
         android:textSize="20sp"
-        android:text="fe80:0:0:0:14fc:8601:eb1c:685a"/>
+        android:text="F2:65:A0:09:FB:3E"/>
 
     <Button
         android:id="@+id/startTobleServiceBtn"
