@@ -16,7 +16,7 @@
  *
  */
 
-package com.google.chip.chiptool.commissioner;
+package com.google.chip.chiptool.commissioner.thread.internal;
 
 import android.Manifest;
 import android.Manifest.permission;
@@ -28,9 +28,11 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 import androidx.annotation.RequiresPermission;
+import com.google.chip.chiptool.commissioner.thread.BorderAgentInfo;
+import com.google.chip.chiptool.commissioner.thread.ThreadNetworkInfo;
 import java.util.Map;
 
-public class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
+class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
 
   private static final String TAG = BorderAgentDiscoverer.class.getSimpleName();
 
@@ -39,20 +41,23 @@ public class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
   private static final String KEY_NETWORK_NAME = "nn";
   private static final String KEY_EXTENDED_PAN_ID = "xp";
 
-  private static final byte[] PSKC = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15};
-
   private WifiManager.MulticastLock wifiMulticastLock;
   private NsdManager nsdManager;
-  private NetworkAdapter networkAdapter;
+  private BorderAgentListener borderAgentListener;
+
+  public interface BorderAgentListener {
+    void onBorderAgentFound(BorderAgentInfo borderAgentInfo);
+    void onBorderAgentLost(BorderAgentInfo borderAgentInfo);
+  }
 
   @RequiresPermission(permission.INTERNET)
-  public BorderAgentDiscoverer(Context context, NetworkAdapter networkAdapter) {
+  public BorderAgentDiscoverer(Context context, BorderAgentListener borderAgentListener) {
     WifiManager wifi = (WifiManager) context.getSystemService(Context.WIFI_SERVICE);
     wifiMulticastLock = wifi.createMulticastLock("multicastLock");
 
     nsdManager = (NsdManager) context.getSystemService(Context.NSD_SERVICE);
 
-    this.networkAdapter = networkAdapter;
+    this.borderAgentListener = borderAgentListener;
   }
 
   public void start() {
@@ -99,37 +104,8 @@ public class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
 
           @Override
           public void onServiceResolved(NsdServiceInfo serviceInfo) {
-            Log.d(TAG, "successfully resolved service " + serviceInfo.toString());
-
-            Map<String, byte[]> attrs = serviceInfo.getAttributes();
-
-            String discriminator = "CC11BB22";
-
-            try {
-              if (attrs.containsKey(KEY_DISCRIMINATOR)) {
-                discriminator = new String(attrs.get(KEY_DISCRIMINATOR));
-              }
-              final BorderAgentInfo borderAgent =
-                  new BorderAgentInfo(
-                      discriminator,
-                      new String(attrs.get(KEY_NETWORK_NAME)),
-                      attrs.get(KEY_EXTENDED_PAN_ID),
-                      serviceInfo.getHost(),
-                      serviceInfo.getPort(),
-                      PSKC);
-
-              Handler handler = new Handler(Looper.getMainLooper());
-              handler.post(
-                  new Runnable() {
-                    @RequiresPermission(Manifest.permission.CAMERA)
-                    @Override
-                    public void run() {
-                      networkAdapter.addNetwork(new NetworkInfo(borderAgent));
-                    }
-                  });
-            } catch (Exception e) {
-              Log.e(TAG, "invalid Border Agent service: " + e.toString());
-            }
+            Log.d(TAG, "successfully resolved service: " + serviceInfo.toString());
+            borderAgentListener.onBorderAgentFound(getBorderAgentInfo(serviceInfo));
           }
         });
   }
@@ -137,6 +113,7 @@ public class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
   @Override
   public void onServiceLost(NsdServiceInfo nsdServiceInfo) {
     Log.d(TAG, "a Border Agent service is gone");
+    borderAgentListener.onBorderAgentLost(getBorderAgentInfo(nsdServiceInfo));
   }
 
   @Override
@@ -147,5 +124,21 @@ public class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
   @Override
   public void onStopDiscoveryFailed(String serviceType, int errorCode) {
     Log.d(TAG, "stop discovering Border Agent failed: " + errorCode);
+  }
+
+  private BorderAgentInfo getBorderAgentInfo(NsdServiceInfo serviceInfo) {
+    Map<String, byte[]> attrs = serviceInfo.getAttributes();
+    String discriminator = "CC11BB22";
+
+    if (attrs.containsKey(KEY_DISCRIMINATOR)) {
+      discriminator = new String(attrs.get(KEY_DISCRIMINATOR));
+    }
+
+    return new BorderAgentInfo(
+        discriminator,
+        new String(attrs.get(KEY_NETWORK_NAME)),
+        attrs.get(KEY_EXTENDED_PAN_ID),
+        serviceInfo.getHost(),
+        serviceInfo.getPort());
   }
 }

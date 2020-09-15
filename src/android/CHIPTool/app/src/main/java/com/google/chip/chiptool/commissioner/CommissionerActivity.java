@@ -22,33 +22,52 @@ import android.content.Intent;
 import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
-import androidx.navigation.NavController;
-import androidx.navigation.Navigation;
+import androidx.fragment.app.Fragment;
 import com.google.chip.chiptool.R;
+import com.google.chip.chiptool.commissioner.thread.internal.SelectNetworkFragment;
 import com.google.chip.chiptool.setuppayloadscanner.BarcodeFragment;
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo;
 
 public class CommissionerActivity extends AppCompatActivity implements BarcodeFragment.Callback {
 
+  public static final String KEY_JOINER_BLE_DEVICE_ADDR = "joiner_ble_device_addr";
+
+  private String joinerBleDeviceAddr;
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.commissioner_activity);
+
+    Intent intent = getIntent();
+    if (intent != null) {
+      joinerBleDeviceAddr = intent.getStringExtra(KEY_JOINER_BLE_DEVICE_ADDR);
+    }
+
+    if (savedInstanceState == null) {
+      showFragment(new BarcodeFragment());
+    }
   }
 
   public void onCHIPDeviceInfoReceived(@NonNull CHIPDeviceInfo deviceInfo) {
-    NavController controller = Navigation.findNavController(this, R.id.nav_host_fragment);
-
-    if (controller.getCurrentDestination().getId() == R.id.commissioner_scan_qr_code_fragment) {
-      Bundle bundle = new Bundle();
-      bundle.putParcelable(Constants.KEY_DEVICE_INFO, deviceInfo);
-      controller.navigate(R.id.action_scan_qr_code_to_select_network, bundle);
-    }
+   showFragment(new SelectNetworkFragment(deviceInfo));
   }
 
   public void finishCommissioning(int resultCode) {
     Intent resultIntent = new Intent();
     setResult(resultCode, resultIntent);
     finish();
+  }
+
+  public String getJoinerBleDeviceAddr() {
+    return joinerBleDeviceAddr;
+  }
+
+  public void showFragment(Fragment fragment) {
+    getSupportFragmentManager()
+        .beginTransaction()
+        .replace(R.id.commissioner_service_activity, fragment, fragment.getClass().getSimpleName())
+        .addToBackStack(null)
+        .commit();
   }
 }
