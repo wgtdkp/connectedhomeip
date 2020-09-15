@@ -62,7 +62,7 @@ public class ThreadCommissionerServiceImpl implements ThreadCommissionerService 
   }
 
   // This method adds given Thread Network Credential into database on the phone.
-  private CompletableFuture<Void> addThreadNetworkCredential(@NonNull BorderAgentInfo borderAgentInfo, @NonNull byte[] pskc, @NonNull ThreadNetworkCredential networkCredential) {
+  CompletableFuture<Void> addThreadNetworkCredential(@NonNull BorderAgentInfo borderAgentInfo, @NonNull byte[] pskc, @NonNull ThreadNetworkCredential networkCredential) {
     BorderAgentRecord borderAgentRecord =
         new BorderAgentRecord(
             borderAgentInfo.discriminator,

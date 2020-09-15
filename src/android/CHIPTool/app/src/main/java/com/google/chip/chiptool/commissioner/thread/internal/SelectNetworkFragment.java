@@ -54,7 +54,10 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
   private NetworkAdapter networksAdapter;
 
   private ThreadNetworkInfoHolder selectedNetwork;
+  private byte[] userInputPskc;
   private Button addDeviceButton;
+
+  private String joinerBleDeviceAddr;
 
   private BorderAgentDiscoverer borderAgentDiscoverer;
 
@@ -73,6 +76,9 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
     networksAdapter = new NetworkAdapter(getContext());
     borderAgentDiscoverer = new BorderAgentDiscoverer(getContext(), networksAdapter);
     borderAgentDiscoverer.start();
+
+    CommissionerActivity commissionerActivity = (CommissionerActivity) getActivity();
+    joinerBleDeviceAddr = commissionerActivity.getJoinerBleDeviceAddr();
   }
 
   @Override
@@ -133,7 +139,8 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
   @Override
   public void onPositiveClick(InputNetworkPasswordDialogFragment fragment, String password) {
     BorderAgentInfo selectedBorderAgent = selectedNetwork.borderAgents.get(0);
-    gotoFetchingCredential(selectedBorderAgent, computePskc(selectedNetwork.networkInfo, password));
+    userInputPskc = computePskc(selectedNetwork.networkInfo, password);
+    gotoFetchingCredential(selectedBorderAgent, userInputPskc);
   }
 
   @Override
@@ -170,7 +177,7 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
       BorderAgentRecord borderAgentRecord = commissionerService.getBorderAgentRecord(selectedBorderAgent).get();  // NetworkCredentialDatabase.getDatabase(getContext()).getNetworkCredential(selectedNetwork);
 
       if (borderAgentRecord != null && borderAgentRecord.getActiveOperationalDataset() != null) {
-        // TODO(wgtdkp): install active operational dataset with BLE.
+        gotoCommissioning(joinerBleDeviceAddr, new ThreadNetworkCredential(borderAgentRecord.getActiveOperationalDataset()));
       } else if (borderAgentRecord != null && borderAgentRecord.getPskc() != null) {
         gotoFetchingCredential(selectedBorderAgent, borderAgentRecord.getPskc());
       } else {
@@ -192,7 +199,19 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
   @Override
   public void onConfirmClick(FetchCredentialDialogFragment fragment,
       ThreadNetworkCredential credential) {
-    CommissionerActivity commissionerActivity = (CommissionerActivity) getActivity();
-    gotoCommissioning(commissionerActivity.getJoinerBleDeviceAddr(), credential);
+    if (credential != null) {
+      ThreadCommissionerServiceImpl commissionerService = new ThreadCommissionerServiceImpl(getContext());
+      try {
+        commissionerService.addThreadNetworkCredential(selectedNetwork.borderAgents.get(0), userInputPskc, credential).get();
+      } catch (ExecutionException e) {
+        e.printStackTrace();
+      } catch (InterruptedException e) {
+        e.printStackTrace();
+      }
+
+      gotoCommissioning(joinerBleDeviceAddr, credential);
+    } else {
+      Log.w(TAG, "failed to fetch credentials");
+    }
   }
 }

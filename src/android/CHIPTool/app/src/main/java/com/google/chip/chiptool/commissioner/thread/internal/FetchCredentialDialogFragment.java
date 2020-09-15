@@ -18,7 +18,7 @@ import com.google.chip.chiptool.commissioner.thread.BorderAgentInfo;
 import com.google.chip.chiptool.commissioner.thread.ThreadCommissionerException;
 import com.google.chip.chiptool.commissioner.thread.ThreadNetworkCredential;
 
-class FetchCredentialDialogFragment extends DialogFragment implements DialogInterface.OnClickListener {
+public class FetchCredentialDialogFragment extends DialogFragment implements DialogInterface.OnClickListener {
 
   private CredentialListener credentialListener;
   private TextView statusText;
@@ -55,11 +55,22 @@ class FetchCredentialDialogFragment extends DialogFragment implements DialogInte
     builder.setNegativeButton(R.string.commissioner_fetch_credential_cancel, this);
 
     dialog = builder.create();
-    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
-
-    startFetching();
-
     return dialog;
+  }
+
+  @Override
+  public void onStart() {
+    super.onStart();
+
+    dialog.getButton(AlertDialog.BUTTON_POSITIVE).setEnabled(false);
+    startFetching();
+  }
+
+  @Override
+  public void onStop() {
+    super.onStop();
+
+    stopFetching();
   }
 
   @Override
@@ -74,6 +85,10 @@ class FetchCredentialDialogFragment extends DialogFragment implements DialogInte
 
   private void startFetching() {
     Thread thread = new Thread(() -> {
+      new Handler(Looper.getMainLooper()).post(() -> {
+        statusText.setText("petitioning...");
+      });
+
       String status;
       try {
         credential = fetcher.fetchNetworkCredential(borderAgentInfo, pskc);

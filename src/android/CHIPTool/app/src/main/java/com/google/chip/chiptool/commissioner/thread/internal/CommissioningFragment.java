@@ -39,11 +39,9 @@ import androidx.work.WorkRequest;
 import com.google.chip.chiptool.R;
 import com.google.chip.chiptool.commissioner.CommissionerActivity;
 import com.google.chip.chiptool.commissioner.thread.ThreadNetworkCredential;
-import com.google.chip.chiptool.commissioner.thread.ThreadNetworkInfo;
-import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo;
 import com.google.gson.Gson;
 
-class CommissioningFragment extends Fragment implements Observer<WorkInfo> {
+public class CommissioningFragment extends Fragment implements Observer<WorkInfo> {
 
   private static final String TAG = CommissioningFragment.class.getSimpleName();
 
@@ -88,8 +86,8 @@ class CommissioningFragment extends Fragment implements Observer<WorkInfo> {
             .putString(Constants.KEY_JOINER_BLE_DEVICE_ADDR, new Gson().toJson(joinerBleDeviceAddr))
             .putString(Constants.KEY_NETWORK_CREDENTIAL, new Gson().toJson(networkCredential))
             .build();
-    // TODO:
-    commssionerWorkRequest = null; // new OneTimeWorkRequest.Builder(CommissionerWorker.class).setInputData(arguments).build();
+
+    commssionerWorkRequest = new OneTimeWorkRequest.Builder(CommissioningWorker.class).setInputData(arguments).build();
 
     WorkManager.getInstance(getActivity()).enqueue(commssionerWorkRequest);
 
@@ -160,3 +158,4 @@ class CommissioningFragment extends Fragment implements Observer<WorkInfo> {
     }
   }
 }
+

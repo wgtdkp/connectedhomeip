@@ -28,7 +28,7 @@ import android.widget.EditText;
 import androidx.fragment.app.DialogFragment;
 import com.google.chip.chiptool.R;
 
-class InputNetworkPasswordDialogFragment extends DialogFragment implements DialogInterface.OnClickListener {
+public class InputNetworkPasswordDialogFragment extends DialogFragment implements DialogInterface.OnClickListener {
 
   private PasswordDialogListener passwordListener;
   private EditText passwordText;

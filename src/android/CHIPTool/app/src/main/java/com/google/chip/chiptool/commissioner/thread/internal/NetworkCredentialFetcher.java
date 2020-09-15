@@ -22,6 +22,7 @@ class NetworkCredentialFetcher {
 
   private static final String TAG = NetworkCredentialFetcher.class.getSimpleName();
 
+  NativeCommissionerHandler nativeCommissionerHandler = new NativeCommissionerHandler();
   Commissioner nativeCommissioner;
 
   public ThreadNetworkCredential fetchNetworkCredential(@NonNull BorderAgentInfo borderAgentInfo, @NonNull byte[] pskc) throws ThreadCommissionerException {
@@ -37,32 +38,42 @@ class NetworkCredentialFetcher {
   }
 
   private ActiveOperationalDataset fetchNetworkCredential(@NonNull InetAddress address, int port, @NonNull byte[] pskc) throws ThreadCommissionerException {
-    nativeCommissioner = Commissioner.create(new NativeCommissionerHandler());
+    nativeCommissioner = Commissioner.create(nativeCommissionerHandler);
 
     Config config = new Config();
     config.setId("TestComm");
     config.setDomainName("TestDomain");
     config.setEnableCcm(false);
+    config.setEnableDtlsDebugLogging(true);
     config.setPSKc(CommissionerUtils.getByteArray(pskc));
     config.setLogger(new NativeCommissionerLogger());
 
-    // Initialize the native commissioner
-    throwIfFail(nativeCommissioner.init(config));
+    try {
+      // Initialize the native commissioner
+      throwIfFail(nativeCommissioner.init(config));
 
-    // Petition to be the active commissioner in the Thread Network.
-    String[] existingCommissionerId = new String[1];
-    throwIfFail(nativeCommissioner.petition(existingCommissionerId, address.getHostAddress(), port));
+      // Petition to be the active commissioner in the Thread Network.
+      String[] existingCommissionerId = new String[1];
+      throwIfFail(
+          nativeCommissioner.petition(existingCommissionerId, address.getHostAddress(), port));
 
-    // Fetch Active Operational Dataset.
-    ActiveOperationalDataset activeOperationalDataset = new ActiveOperationalDataset();
-    throwIfFail(nativeCommissioner.getActiveDataset(activeOperationalDataset, 0xFFFF));
-    nativeCommissioner.resign();
-
-    return activeOperationalDataset;
+      // Fetch Active Operational Dataset.
+      ActiveOperationalDataset activeOperationalDataset = new ActiveOperationalDataset();
+      throwIfFail(nativeCommissioner.getActiveDataset(activeOperationalDataset, 0xFFFF));
+      nativeCommissioner.resign();
+      nativeCommissioner = null;
+      return activeOperationalDataset;
+    } catch (ThreadCommissionerException e) {
+      nativeCommissioner.resign();
+      nativeCommissioner = null;
+      throw e;
+    }
   }
 
   private void throwIfFail(Error error) throws ThreadCommissionerException {
-    throw new ThreadCommissionerException(error.getCode().swigValue(), error.getMessage());
+    if (error.getCode() != ErrorCode.kNone) {
+      throw new ThreadCommissionerException(error.getCode().swigValue(), error.getMessage());
+    }
   }
 }
 
