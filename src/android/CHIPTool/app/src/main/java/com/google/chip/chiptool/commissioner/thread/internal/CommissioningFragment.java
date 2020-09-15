@@ -38,6 +38,7 @@ import androidx.work.WorkManager;
 import androidx.work.WorkRequest;
 import com.google.chip.chiptool.R;
 import com.google.chip.chiptool.commissioner.CommissionerActivity;
+import com.google.chip.chiptool.commissioner.thread.ThreadNetworkCredential;
 import com.google.chip.chiptool.commissioner.thread.ThreadNetworkInfo;
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo;
 import com.google.gson.Gson;
@@ -46,9 +47,8 @@ class CommissioningFragment extends Fragment implements Observer<WorkInfo> {
 
   private static final String TAG = CommissioningFragment.class.getSimpleName();
 
-  private CHIPDeviceInfo deviceInfo;
-  private ThreadNetworkInfo threadNetworkInfo;
-  private byte[] pskc;
+  private String joinerBleDeviceAddr;
+  private ThreadNetworkCredential networkCredential;
 
   WorkRequest commssionerWorkRequest;
 
@@ -59,10 +59,9 @@ class CommissioningFragment extends Fragment implements Observer<WorkInfo> {
   ImageView doneImage;
   ImageView errorImage;
 
-  public CommissioningFragment(CHIPDeviceInfo deviceInfo, ThreadNetworkInfo threadNetworkInfo, byte[] pskc) {
-    this.deviceInfo = deviceInfo;
-    this.threadNetworkInfo = threadNetworkInfo;
-    this.pskc = pskc;
+  public CommissioningFragment(@NonNull String joinerBleDeviceAddr, @NonNull ThreadNetworkCredential networkCredential) {
+    this.joinerBleDeviceAddr = joinerBleDeviceAddr;
+    this.networkCredential = networkCredential;
   }
 
   @Override
@@ -86,9 +85,8 @@ class CommissioningFragment extends Fragment implements Observer<WorkInfo> {
 
     Data arguments =
         new Data.Builder()
-            .putString(Constants.KEY_DEVICE_INFO, new Gson().toJson(deviceInfo))
-            .putString(Constants.KEY_NETWORK_INFO, new Gson().toJson(threadNetworkInfo))
-            .putString(Constants.KEY_PSKC, new Gson().toJson(pskc))
+            .putString(Constants.KEY_JOINER_BLE_DEVICE_ADDR, new Gson().toJson(joinerBleDeviceAddr))
+            .putString(Constants.KEY_NETWORK_CREDENTIAL, new Gson().toJson(networkCredential))
             .build();
     // TODO:
     commssionerWorkRequest = null; // new OneTimeWorkRequest.Builder(CommissionerWorker.class).setInputData(arguments).build();

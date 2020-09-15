@@ -13,6 +13,10 @@ public class ThreadNetworkCredential implements NetworkCredential, Parcelable {
     this.activeOperationalDataset = activeOperationalDataset;
   }
 
+  public byte[] getActiveOperationalDataset() {
+    return activeOperationalDataset;
+  }
+
   @Override
   public byte[] getEncoded() {
     return activeOperationalDataset;

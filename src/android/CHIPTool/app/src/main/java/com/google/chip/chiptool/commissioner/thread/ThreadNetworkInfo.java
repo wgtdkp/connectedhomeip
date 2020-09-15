@@ -30,6 +30,11 @@ public class ThreadNetworkInfo implements Parcelable {
   @NonNull
   public byte[] extendedPanId;
 
+  public ThreadNetworkInfo(@NonNull String networkName, @NonNull byte[] extendedPanId) {
+    this.networkName = networkName;
+    this.extendedPanId = extendedPanId;
+  }
+
   protected ThreadNetworkInfo(Parcel in) {
     networkName = in.readString();
     extendedPanId = in.createByteArray();

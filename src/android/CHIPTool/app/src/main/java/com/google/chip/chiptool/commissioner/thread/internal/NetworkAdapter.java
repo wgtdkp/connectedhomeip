@@ -19,18 +19,23 @@
 package com.google.chip.chiptool.commissioner.thread.internal;
 
 import android.content.Context;
+import android.os.Handler;
+import android.os.Looper;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.BaseAdapter;
 import android.widget.TextView;
 import com.google.chip.chiptool.R;
+import com.google.chip.chiptool.commissioner.thread.BorderAgentInfo;
 import com.google.chip.chiptool.commissioner.thread.ThreadNetworkInfo;
+import com.google.chip.chiptool.commissioner.thread.internal.BorderAgentDiscoverer.BorderAgentListener;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Vector;
 
-class NetworkAdapter extends BaseAdapter {
-  private Vector<ThreadNetworkInfo> networks;
+class NetworkAdapter extends BaseAdapter implements BorderAgentListener {
+  private Vector<ThreadNetworkInfoHolder> networks;
 
   private LayoutInflater inflater;
 
@@ -39,17 +44,37 @@ class NetworkAdapter extends BaseAdapter {
     networks = new Vector<>();
   }
 
-  public boolean addNetwork(ThreadNetworkInfo newNetwork) {
-    for (ThreadNetworkInfo network : networks) {
-      if (network.networkName.equals(newNetwork.networkName)
-          && Arrays.equals(network.extendedPanId, newNetwork.extendedPanId)) {
-        return false;
+  public void addBorderAgent(BorderAgentInfo borderAgent) {
+    boolean hasExistingNetwork = false;
+    for (ThreadNetworkInfoHolder networkInfoHolder : networks) {
+      if (networkInfoHolder.networkInfo.networkName.equals(borderAgent.networkName)
+          && Arrays.equals(networkInfoHolder.networkInfo.extendedPanId, borderAgent.extendedPanId)) {
+        networkInfoHolder.borderAgents.add(borderAgent);
+        hasExistingNetwork = true;
       }
     }
 
-    networks.add(newNetwork);
-    notifyDataSetChanged();
-    return true;
+    if (!hasExistingNetwork) {
+      networks.add(new ThreadNetworkInfoHolder(borderAgent));
+    }
+
+    new Handler(Looper.getMainLooper()).post(() -> notifyDataSetChanged());
+  }
+
+  public void removeBorderAgent(BorderAgentInfo lostBorderAgent) {
+    for (ThreadNetworkInfoHolder networkInfoHolder : networks) {
+      for (BorderAgentInfo borderAgent : networkInfoHolder.borderAgents) {
+        if (borderAgent.equals(lostBorderAgent)) {
+          networkInfoHolder.borderAgents.remove(borderAgent);
+          if (networkInfoHolder.borderAgents.isEmpty()) {
+            networks.remove(networkInfoHolder);
+          }
+
+          new Handler(Looper.getMainLooper()).post(() -> notifyDataSetChanged());
+          return;
+        }
+      }
+    }
   }
 
   @Override
@@ -73,7 +98,17 @@ class NetworkAdapter extends BaseAdapter {
       convertView = inflater.inflate(R.layout.commissioner_network_list_item, container, false);
     }
     TextView networkNameText = convertView.findViewById(R.id.network_name);
-    networkNameText.setText(networks.get(position).networkName);
+    networkNameText.setText(networks.get(position).networkInfo.networkName);
     return convertView;
+  }
+
+  @Override
+  public void onBorderAgentFound(BorderAgentInfo borderAgentInfo) {
+    addBorderAgent(borderAgentInfo);
+  }
+
+  @Override
+  public void onBorderAgentLost(BorderAgentInfo borderAgentInfo) {
+    removeBorderAgent(borderAgentInfo);
   }
 }

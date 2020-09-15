@@ -28,4 +28,8 @@ class Constants {
   public static final String KEY_COMMISSIONING_STATUS = "commissioning_status";
 
   public static final String KEY_SUCCESS = "success";
+
+  public static final String KEY_JOINER_BLE_DEVICE_ADDR = "joiner_ble_device_addr";
+
+  public static final String KEY_NETWORK_CREDENTIAL = "network_credential";
 }

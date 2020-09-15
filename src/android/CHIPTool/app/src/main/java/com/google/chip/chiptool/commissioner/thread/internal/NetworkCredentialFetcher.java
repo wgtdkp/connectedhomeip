@@ -22,13 +22,22 @@ class NetworkCredentialFetcher {
 
   private static final String TAG = NetworkCredentialFetcher.class.getSimpleName();
 
+  Commissioner nativeCommissioner;
+
   public ThreadNetworkCredential fetchNetworkCredential(@NonNull BorderAgentInfo borderAgentInfo, @NonNull byte[] pskc) throws ThreadCommissionerException {
     ActiveOperationalDataset activeOperationalDataset = fetchNetworkCredential(borderAgentInfo.host, borderAgentInfo.port, pskc);
     return new ThreadNetworkCredential(CommissionerUtils.getByteArray(activeOperationalDataset.getRawTlvs()));
   }
 
+  public void cancel() {
+    if (nativeCommissioner != null) {
+      Log.d(TAG, "cancel requesting credential");
+      nativeCommissioner.cancelRequests();
+    }
+  }
+
   private ActiveOperationalDataset fetchNetworkCredential(@NonNull InetAddress address, int port, @NonNull byte[] pskc) throws ThreadCommissionerException {
-    Commissioner nativeCommissioner = Commissioner.create(new NativeCommissionerHandler());
+    nativeCommissioner = Commissioner.create(new NativeCommissionerHandler());
 
     Config config = new Config();
     config.setId("TestComm");

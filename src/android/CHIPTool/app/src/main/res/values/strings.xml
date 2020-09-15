@@ -43,5 +43,7 @@
     <string name="commissioner_password">password</string>
     <string name="commissioner_password_connect">connect</string>
     <string name="commissioner_password_cancel">cancel</string>
+    <string name="commissioner_fetch_credential_done">done</string>
+    <string name="commissioner_fetch_credential_cancel">cancel</string>
     <string name="commissioner_commissioning_fragment_label">Commissioning</string>
 </resources>

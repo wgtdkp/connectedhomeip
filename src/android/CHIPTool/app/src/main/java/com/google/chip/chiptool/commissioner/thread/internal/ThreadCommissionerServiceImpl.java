@@ -44,12 +44,16 @@ public class ThreadCommissionerServiceImpl implements ThreadCommissionerService 
 
   @Override
   public CompletableFuture<ThreadNetworkCredential> getThreadNetworkCredential(@NonNull BorderAgentInfo borderAgentInfo) {
-    return borderAgentDatabase.getBorderAgent(borderAgentInfo.discriminator).thenApply(borderAgentRecord -> {
+    return getBorderAgentRecord(borderAgentInfo).thenApply(borderAgentRecord -> {
       if (borderAgentRecord == null) {
         return null;
       }
       return new ThreadNetworkCredential(borderAgentRecord.getActiveOperationalDataset());
     });
+  }
+
+  CompletableFuture<BorderAgentRecord> getBorderAgentRecord(@NonNull BorderAgentInfo borderAgentInfo) {
+    return borderAgentDatabase.getBorderAgent(borderAgentInfo.discriminator);
   }
 
   @Override

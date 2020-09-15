@@ -69,6 +69,10 @@ public class BorderAgentInfo implements Parcelable {
     return 0;
   }
 
+  public boolean equals(BorderAgentInfo other) {
+    return this.discriminator.equals(other.discriminator);
+  }
+
   public static final Creator<BorderAgentInfo> CREATOR =
       new Creator<BorderAgentInfo>() {
         @Override

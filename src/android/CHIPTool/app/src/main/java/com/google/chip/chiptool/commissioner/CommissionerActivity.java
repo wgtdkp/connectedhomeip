@@ -24,15 +24,25 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import com.google.chip.chiptool.R;
+import com.google.chip.chiptool.commissioner.thread.internal.SelectNetworkFragment;
 import com.google.chip.chiptool.setuppayloadscanner.BarcodeFragment;
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo;
 
 public class CommissionerActivity extends AppCompatActivity implements BarcodeFragment.Callback {
 
+  public static final String KEY_JOINER_BLE_DEVICE_ADDR = "joiner_ble_device_addr";
+
+  private String joinerBleDeviceAddr;
+
   @Override
   protected void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
     setContentView(R.layout.commissioner_activity);
+
+    Intent intent = getIntent();
+    if (intent != null) {
+      joinerBleDeviceAddr = intent.getStringExtra(KEY_JOINER_BLE_DEVICE_ADDR);
+    }
 
     if (savedInstanceState == null) {
       showFragment(new BarcodeFragment());
@@ -40,14 +50,17 @@ public class CommissionerActivity extends AppCompatActivity implements BarcodeFr
   }
 
   public void onCHIPDeviceInfoReceived(@NonNull CHIPDeviceInfo deviceInfo) {
-  // FIXME(wgtdkp):
-  // showFragment(new SelectNetworkFragment(deviceInfo));
+   showFragment(new SelectNetworkFragment(deviceInfo));
   }
 
   public void finishCommissioning(int resultCode) {
     Intent resultIntent = new Intent();
     setResult(resultCode, resultIntent);
     finish();
+  }
+
+  public String getJoinerBleDeviceAddr() {
+    return joinerBleDeviceAddr;
   }
 
   public void showFragment(Fragment fragment) {

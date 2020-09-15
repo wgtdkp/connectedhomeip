@@ -33,7 +33,9 @@ import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.Fragment;
 import com.google.chip.chiptool.R;
 import com.google.chip.chiptool.commissioner.CommissionerActivity;
+import com.google.chip.chiptool.commissioner.thread.BorderAgentInfo;
 import com.google.chip.chiptool.commissioner.thread.CommissionerUtils;
+import com.google.chip.chiptool.commissioner.thread.ThreadCommissionerService;
 import com.google.chip.chiptool.commissioner.thread.ThreadNetworkCredential;
 import com.google.chip.chiptool.commissioner.thread.ThreadNetworkInfo;
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo;
@@ -43,7 +45,7 @@ import io.openthread.commissioner.Error;
 import io.openthread.commissioner.ErrorCode;
 import java.util.concurrent.ExecutionException;
 
-class SelectNetworkFragment extends Fragment implements InputNetworkPasswordDialogFragment.PasswordDialogListener, View.OnClickListener {
+public class SelectNetworkFragment extends Fragment implements InputNetworkPasswordDialogFragment.PasswordDialogListener, FetchCredentialDialogFragment.CredentialListener, View.OnClickListener {
 
   private static final String TAG = CommissioningFragment.class.getSimpleName();
 
@@ -51,10 +53,14 @@ class SelectNetworkFragment extends Fragment implements InputNetworkPasswordDial
 
   private NetworkAdapter networksAdapter;
 
-  private ThreadNetworkInfo selectedNetwork;
+  private ThreadNetworkInfoHolder selectedNetwork;
   private Button addDeviceButton;
 
   private BorderAgentDiscoverer borderAgentDiscoverer;
+
+  public SelectNetworkFragment() {
+
+  }
 
   public SelectNetworkFragment(CHIPDeviceInfo deviceInfo) {
     this.deviceInfo = deviceInfo;
@@ -65,7 +71,7 @@ class SelectNetworkFragment extends Fragment implements InputNetworkPasswordDial
     super.onCreate(savedInstanceState);
 
     networksAdapter = new NetworkAdapter(getContext());
-    borderAgentDiscoverer = null; // new BorderAgentDiscoverer(getContext(), networksAdapter);
+    borderAgentDiscoverer = new BorderAgentDiscoverer(getContext(), networksAdapter);
     borderAgentDiscoverer.start();
   }
 
@@ -83,6 +89,7 @@ class SelectNetworkFragment extends Fragment implements InputNetworkPasswordDial
     return inflater.inflate(R.layout.commissioner_select_network_fragment, container, false);
   }
 
+  @Override
   public void onViewCreated(@NonNull View view, Bundle savedInstanceState) {
     super.onViewCreated(view, savedInstanceState);
 
@@ -105,19 +112,15 @@ class SelectNetworkFragment extends Fragment implements InputNetworkPasswordDial
 
     networkListView.setOnItemClickListener(
       (AdapterView<?> adapterView, View v, int position, long id) -> {
-        selectedNetwork = (ThreadNetworkInfo) adapterView.getItemAtPosition(position);
+        selectedNetwork = (ThreadNetworkInfoHolder) adapterView.getItemAtPosition(position);
         addDeviceButton.setVisibility(View.VISIBLE);
       });
 
     view.findViewById(R.id.add_device_button).setOnClickListener(this);
   }
 
-  private void gotoCommissioning(@NonNull byte[] pskc) {
-    gotoCommissioning(deviceInfo, selectedNetwork, pskc);
-  }
-
-  private void gotoCommissioning(@NonNull CHIPDeviceInfo deviceInfo, @NonNull ThreadNetworkInfo threadNetworkInfo, @NonNull byte[] pskc) {
-    CommissioningFragment fragment = new CommissioningFragment(deviceInfo, threadNetworkInfo, pskc);
+  private void gotoCommissioning(@NonNull String peerBleAddr, @NonNull ThreadNetworkCredential credential) {
+    CommissioningFragment fragment = new CommissioningFragment(peerBleAddr, credential);
     getParentFragmentManager()
         .beginTransaction()
         .replace(R.id.commissioner_service_activity, fragment, fragment.getClass().getSimpleName())
@@ -129,7 +132,8 @@ class SelectNetworkFragment extends Fragment implements InputNetworkPasswordDial
 
   @Override
   public void onPositiveClick(InputNetworkPasswordDialogFragment fragment, String password) {
-    gotoCommissioning(computePskc(selectedNetwork, password));
+    BorderAgentInfo selectedBorderAgent = selectedNetwork.borderAgents.get(0);
+    gotoFetchingCredential(selectedBorderAgent, computePskc(selectedNetwork.networkInfo, password));
   }
 
   @Override
@@ -153,16 +157,22 @@ class SelectNetworkFragment extends Fragment implements InputNetworkPasswordDial
     return CommissionerUtils.getByteArray(pskc);
   }
 
+  private void gotoFetchingCredential(BorderAgentInfo borderAgentInfo, byte[] pskc) {
+    new FetchCredentialDialogFragment(borderAgentInfo, pskc, SelectNetworkFragment.this)
+        .show(getParentFragmentManager(), FetchCredentialDialogFragment.class.getSimpleName());
+  }
+
   @Override
   public void onClick(View view) {
-    /*
     try {
-      ThreadNetworkCredential networkCredential = NetworkCredentialDatabase.getDatabase(getContext()).getNetworkCredential(selectedNetwork);
+      BorderAgentInfo selectedBorderAgent = selectedNetwork.borderAgents.get(0);
+      ThreadCommissionerServiceImpl commissionerService = new ThreadCommissionerServiceImpl(getContext());
+      BorderAgentRecord borderAgentRecord = commissionerService.getBorderAgentRecord(selectedBorderAgent).get();  // NetworkCredentialDatabase.getDatabase(getContext()).getNetworkCredential(selectedNetwork);
 
-      if (networkCredential != null && networkCredential.getActiveOperationalDataset() != null) {
+      if (borderAgentRecord != null && borderAgentRecord.getActiveOperationalDataset() != null) {
         // TODO(wgtdkp): install active operational dataset with BLE.
-      } else if (networkCredential != null && networkCredential.getPskc() != null) {
-        gotoCommissioning(networkCredential.getPskc());
+      } else if (borderAgentRecord != null && borderAgentRecord.getPskc() != null) {
+        gotoFetchingCredential(selectedBorderAgent, borderAgentRecord.getPskc());
       } else {
         new InputNetworkPasswordDialogFragment(SelectNetworkFragment.this).show(
             getParentFragmentManager(), InputNetworkPasswordDialogFragment.class.getSimpleName());
@@ -172,6 +182,17 @@ class SelectNetworkFragment extends Fragment implements InputNetworkPasswordDial
     } catch (InterruptedException e) {
       e.printStackTrace();
     }
-    */
+  }
+
+  @Override
+  public void onCancelClick(FetchCredentialDialogFragment fragment) {
+
+  }
+
+  @Override
+  public void onConfirmClick(FetchCredentialDialogFragment fragment,
+      ThreadNetworkCredential credential) {
+    CommissionerActivity commissionerActivity = (CommissionerActivity) getActivity();
+    gotoCommissioning(commissionerActivity.getJoinerBleDeviceAddr(), credential);
   }
 }
