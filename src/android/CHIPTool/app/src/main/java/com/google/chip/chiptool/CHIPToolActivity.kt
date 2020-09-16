@@ -18,11 +18,16 @@
 package com.google.chip.chiptool
 
 import android.app.Activity
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.net.VpnService
 import android.os.Bundle
 import android.util.Log
+import android.view.Menu
 import androidx.appcompat.app.AppCompatActivity
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.fragment.app.Fragment
 import com.google.chip.chiptool.clusterclient.OnOffClientFragment
 import com.google.chip.chiptool.commissioner.CommissionerActivity
@@ -31,7 +36,7 @@ import com.google.chip.chiptool.setuppayloadscanner.BarcodeFragment
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceDetailsFragment
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo
 import io.openthread.toble.TobleService
-import kotlinx.android.synthetic.main.select_action_fragment.remoteIpAddressEd
+import kotlinx.android.synthetic.main.select_action_fragment.remoteBleAddressEd
 import java.io.IOException
 import java.net.DatagramPacket
 import java.net.DatagramSocket
@@ -45,6 +50,16 @@ class CHIPToolActivity :
     AppCompatActivity(),
     BarcodeFragment.Callback,
     SelectActionFragment.Callback {
+
+  private var peerDeviceIp6Addr: String = "UNKNOWN"
+
+  private var tobleServiceReceiver = object : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+      if (intent != null) {
+        peerDeviceIp6Addr = intent.getStringExtra(TobleService.KEY_PEER_IP6_ADDR)!!
+      }
+    }
+  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -62,6 +77,16 @@ class CHIPToolActivity :
   override fun onDestroy() {
     super.onDestroy()
     stopTobleService()
+  }
+
+  override fun onResume() {
+    super.onResume()
+    LocalBroadcastManager.getInstance(this).registerReceiver(tobleServiceReceiver, IntentFilter(TobleService.ACTION_PEER_CONNECTED))
+  }
+
+  override fun onPause() {
+    super.onPause()
+    LocalBroadcastManager.getInstance(this).unregisterReceiver(tobleServiceReceiver)
   }
 
   override fun onCHIPDeviceInfoReceived(deviceInfo: CHIPDeviceInfo) {
@@ -94,9 +119,6 @@ class CHIPToolActivity :
   }
 
   override fun handleSendUdpClicked() {
-
-    var remoteIp: String = getPeerAddress()
-
     val sendAndReceive =
       FutureTask(Callable<String> {
         var socket: DatagramSocket? = null
@@ -105,7 +127,7 @@ class CHIPToolActivity :
           socket = DatagramSocket(11095)
           //socket.connect( InetAddress.getByName(ThreadVpnService.LOCAL_ADDR), 6666);
           // We cannot use the address (2001:1983::de8) assigned to the TUN interface.
-          socket.connect(InetAddress.getByName(remoteIp + "%tun0"), TEST_REMOTE_DEVICE_PORT)
+          socket.connect(InetAddress.getByName(peerDeviceIp6Addr + "%tun0"), TEST_REMOTE_DEVICE_PORT)
           val packet = DatagramPacket(hello, hello.size)
           Log.i("SEND_UDP", "Sending hello to VPN service")
           socket.send(packet)
@@ -139,7 +161,7 @@ class CHIPToolActivity :
       if (resultCode == Activity.RESULT_OK) {
         var intent = Intent(this, TobleService::class.java)
         intent.setAction(TobleService.ACTION_START)
-        intent.putExtra(TobleService.KEY_PEER_ADDR, getPeerAddress())
+        intent.putExtra(TobleService.KEY_PEER_BLE_ADDR, getPeerBleAddress())
         startService(intent)
       }
     }
@@ -169,8 +191,8 @@ class CHIPToolActivity :
     startService(intent);
   }
 
-  private fun getPeerAddress(): String {
-    return remoteIpAddressEd.text.toString()
+  private fun getPeerBleAddress(): String {
+    return remoteBleAddressEd.text.toString()
   }
 
   companion object {

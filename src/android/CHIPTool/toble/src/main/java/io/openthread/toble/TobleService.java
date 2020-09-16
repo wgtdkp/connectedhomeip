@@ -6,6 +6,7 @@ import android.os.ParcelFileDescriptor;
 import android.util.Log;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
@@ -35,11 +36,16 @@ public class TobleService extends VpnService implements TobleRunner {
 
   public static final String ACTION_START = "io.openthread.toble.TobleService.START";
   public static final String ACTION_STOP = "io.openthread.toble.TobleService.STOP";
-  public static final String KEY_LOCAL_ADDR = "local_addr";
-  public static final String KEY_PEER_ADDR = "peer_addr";
+  public static final String KEY_PEER_BLE_ADDR = "peer_ble_addr";
+  public static final String KEY_PEER_IP6_ADDR = "peer_ip6_addr";
+  public static final String KEY_LOCAL_IP6_ADDR = "local_ip6_addr";
+  public static final String ACTION_PEER_CONNECTED = "peer_connected";
 
   /** Maximum packet size is constrained by the MTU, which is given as a signed short. */
   private static final int MAX_PACKET_SIZE = 1024;
+  private static final int BLE_CONNECTION_INTERVAL = 1000; // In Milliseconds.
+  private static final int BLE_CONNECTION_SCAN_INTERVAL = 50; // In Milliseconds.
+  private static final int BLE_CONNECTION_SCAN_WINDOW = 40; // In Milliseconds.
 
   private Toble toble = Toble.getInstance();
   private TobleHandler tobleHandler = new TobleHandler();
@@ -49,9 +55,17 @@ public class TobleService extends VpnService implements TobleRunner {
 
   private Thread thread;
 
-  private FileOutputStream outputStream;
+  private ParcelFileDescriptor tunInterface;
+  private FileInputStream tunInterfaceIn;
+  private FileOutputStream tunInterfaceOut;
 
-  private AtomicBoolean isRunning = new AtomicBoolean(false);
+  private static final int STATE_IDLE = 0;
+  private static final int STATE_CONNECTING = 1;
+  private static final int STATE_CONNECTED = 2;
+  private static final int STATE_DISCONNECTED = 4;
+
+  private AtomicInteger state = new AtomicInteger(STATE_IDLE);
+  private AtomicBoolean shouldStop = new AtomicBoolean(false);
 
   @Override
   public int onStartCommand(Intent intent, int flags, int startId) {
@@ -63,13 +77,7 @@ public class TobleService extends VpnService implements TobleRunner {
       stop();
       return START_NOT_STICKY;
     } else {
-      try {
-        Inet6Address peerAddr = (Inet6Address) InetAddress.getByName(intent.getExtras().getString(KEY_PEER_ADDR));
-
-        start(peerAddr);
-      } catch (UnknownHostException e) {
-        e.printStackTrace();
-      }
+      start(intent.getExtras().getString(KEY_PEER_BLE_ADDR));
       return START_STICKY;
     }
   }
@@ -80,7 +88,83 @@ public class TobleService extends VpnService implements TobleRunner {
     super.onDestroy();
   }
 
-  private void start(Inet6Address peerAddr) {
+  private void connectToPeer(String peerBleAddr) {
+    otError error = toble.connect(TobleUtils.tobleAddrFromString(peerBleAddr),
+                                  BLE_CONNECTION_INTERVAL,
+                                  BLE_CONNECTION_SCAN_INTERVAL,
+                                  BLE_CONNECTION_SCAN_WINDOW);
+    if (error != otError.OT_ERROR_NONE) {
+      Log.e(TAG, String.format("failed to connect to peer device: %s", peerBleAddr));
+    }
+  }
+
+  private void forwardPacketTo6oble() {
+    byte[] packet = new byte[MAX_PACKET_SIZE];
+
+    assert(state.get() == STATE_CONNECTED);
+
+    try {
+      int length = tunInterfaceIn.read(packet);
+      if (length > 0) {
+        Log.d(TAG, String.format("sending packet via ToBLE: %s", TobleUtils.getHexString(packet, length)));
+
+        otError error = toble.ip6Send(TobleUtils.getByteArray(packet, length).cast(), length);
+        if (!error.equals(otError.OT_ERROR_NONE)) {
+          Log.e(TAG, "sending packets to ToBLE failed");
+        }
+      }
+    } catch (IOException e) {
+      e.printStackTrace();
+    }
+
+  }
+
+  private void start(String peerBleAddr) {
+    if (state.get() == STATE_CONNECTING || state.get() == STATE_CONNECTED) {
+      Log.w(TAG, "The 6oBLE service is already running");
+      return;
+    }
+
+    state.set(STATE_IDLE);
+
+    Log.d(TAG, "start 6oBLE service with remote BLE address: " + peerBleAddr.toString());
+
+    toble.init(tobleHandler, tobleDriver);
+
+    thread = new Thread(() -> {
+      connectToPeer(peerBleAddr);
+
+      try {
+        while (!shouldStop.get() && (state.get() == STATE_CONNECTING || state.get() == STATE_CONNECTED)) {
+          if (state.get() == STATE_CONNECTED) {
+            forwardPacketTo6oble();
+          } else if (state.get() == STATE_DISCONNECTED) {
+            shouldStop.set(true);
+          }
+
+          while (!taskQueue.isEmpty()) {
+            taskQueue.take().run();
+          }
+
+          toble.process();
+        }
+
+        Log.d(TAG, "6oBLE service is stopped");
+      } catch (Exception e) {
+        e.printStackTrace();
+      } finally {
+        tobleDriver.finalize();
+        toble.deinit();
+        destroyTunInterface();
+      }
+    });
+
+    state.set(STATE_CONNECTING);
+    thread.start();
+  }
+
+  /*
+  private void runToble(Inet6Address peerAddr) {
     if (isRunning.get()) {
       Log.w(TAG, "The VPN service is already running");
       return;
@@ -158,40 +242,104 @@ public class TobleService extends VpnService implements TobleRunner {
 
     thread.start();
   }
+  */
 
   private void stop() {
-    if (isRunning.get()) {
-      isRunning.set(false);
-      thread = null;
-    }
+    shouldStop.set(true);
+    thread = null;
   }
 
   private void receivePacketFromToble(byte[] packet) {
-    if (isRunning.get()) {
+    if (state.get() == STATE_CONNECTED) {
       postTask(() -> {
         try {
-          outputStream.write(packet);
-          Log.d(TAG, String.format("received packet from ToBLE: %s",
-              TobleUtils.getHexString(packet, packet.length)));
+          tunInterfaceOut.write(packet);
+          Log.d(TAG, String.format("received packet from ToBLE: %s", TobleUtils.getHexString(packet, packet.length)));
         } catch (IOException e) {
           e.printStackTrace();
         }
       });
     } else {
-      Log.e(TAG, "serivce is down, dropping packet");
+      Log.e(TAG, "6oBLE serivce is down, dropping packet");
     }
   }
 
   @Override
   public void postTask(Runnable task) {
-    if (isRunning.get()) {
+    if (state.get() == STATE_CONNECTING || state.get() == STATE_CONNECTED) {
       taskQueue.add(task);
     } else {
-      Log.e(TAG, "service is down, drop task!");
+      Log.e(TAG, "6oBLE service is down, dropping task!");
     }
   }
 
+  private void createTunInterface(String localAddr, String peerAddr) {
+    Log.d(TAG, String.format("create TUN interface with localAddr=%s, peerAddr=%s", localAddr, peerAddr));
+
+    // Configure the TUN and get the interface.
+    tunInterface = new Builder().setSession("My6obleService")
+        .addAddress(localAddr, 128)
+        .addRoute(peerAddr, 128)
+        .setBlocking(false)
+        .establish();
+
+    // Packets to be sent are queued in this input stream.
+    tunInterfaceIn = new FileInputStream(tunInterface.getFileDescriptor());
+
+    // Packets received need to be written to this output stream.
+    tunInterfaceOut = new FileOutputStream(tunInterface.getFileDescriptor());
+  }
+
+  private void destroyTunInterface() {
+    if (tunInterface != null) {
+      try {
+        tunInterfaceIn.close();
+        tunInterfaceOut.close();
+        tunInterface.close();
+      } catch (IOException e) {
+        e.printStackTrace();
+      }
+
+      tunInterfaceIn = null;
+      tunInterfaceOut = null;
+      tunInterface = null;
+    }
+  }
+
+  private void sendConnectedBroadcast(String localAddr, String peerAddr) {
+    Intent intent = new Intent(ACTION_PEER_CONNECTED);
+    intent.putExtra(KEY_LOCAL_IP6_ADDR, localAddr);
+    intent.putExtra(KEY_PEER_IP6_ADDR, peerAddr);
+    LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+  }
+
   class TobleHandler extends TobleCallbacks {
+    @Override
+    public void onConnected(otError aError, TobleConnection aConn, String aLocalAddress, String aPeerAddress) {
+      if (aError != aError.OT_ERROR_NONE) {
+        postTask(() -> {
+          Log.e(TAG, "failed to connected to peer device");
+          state.set(STATE_DISCONNECTED);
+        });
+      } else {
+        postTask(() -> {
+          Log.i(TAG, String.format("connected to peer device: %s", aPeerAddress));
+          createTunInterface(aLocalAddress, aPeerAddress);
+          sendConnectedBroadcast(aLocalAddress, aPeerAddress);
+          state.set(STATE_CONNECTED);
+        });
+      }
+    }
+
+    @Override
+    public void onDisconnected(otError aError, TobleConnection aConn, String aLocalAddress, String aPeerAddress) {
+      postTask(() -> {
+        Log.d(TAG, "disconnecting from peer device: " + aPeerAddress);
+        destroyTunInterface();
+        state.set(STATE_DISCONNECTED);
+      });
+    }
+
     @Override
     public void onIp6Receive(SWIGTYPE_p_unsigned_char aPacket, long aPacketLength) {
       ByteArray packet = ByteArray.frompointer(aPacket);

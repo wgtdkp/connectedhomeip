@@ -14,11 +14,16 @@ import android.bluetooth.le.ScanCallback;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.Context;
+import android.os.Build;
 import android.util.Log;
 import java.util.Calendar;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 /**
  * This class implements the OpenThread platform driver required by ToBLE.
@@ -51,14 +56,19 @@ public class TobleDriverImpl extends TobleDriver {
   private TobleConnection connection;
   private int connectionState = BluetoothProfile.STATE_DISCONNECTED;
 
-  private boolean subscribeC2;
+  private ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
 
   private ConcurrentLinkedDeque<byte[]> c1Queue = new ConcurrentLinkedDeque<>();
 
   public void finalize() {
     if (bluetoothGattClient != null) {
       scanStop();
-      bluetoothGattClient.close();
+
+      if (connectionState == BluetoothGatt.STATE_DISCONNECTED) {
+        disconnect(connection);
+      } else {
+        releaseConnection();
+      }
     }
   }
 
@@ -68,6 +78,17 @@ public class TobleDriverImpl extends TobleDriver {
 
   private String ServiceToString(BluetoothGattService service) {
     return String.format("(uuid=%s)", service.getUuid());
+  }
+
+  private void postDelayed(Runnable task, int delay, TimeUnit timeUnit) {
+    executor.schedule(task, delay, timeUnit);
+  }
+
+  private void releaseConnection() {
+    connectionState = BluetoothGatt.STATE_DISCONNECTED;
+    connection = null;
+    bluetoothGattClient.close();
+    bluetoothGattClient = null;
   }
 
   private ScanCallback scanCallback = new ScanCallback() {
@@ -107,25 +128,34 @@ public class TobleDriverImpl extends TobleDriver {
         Log.d(TAG, String.format("unexpected GATT error: %d", status));
 
         tobleRunner.postTask(() -> onDisconnected(connection));
-        gatt.close();
+        releaseConnection();
         return;
       }
 
       if (newState == BluetoothProfile.STATE_CONNECTED) {
         Log.d(TAG, "connected to GATT server");
 
-        gatt.discoverServices();
-        //gatt.requestMtu(gattMtu);
+        int bondState = gatt.getDevice().getBondState();
+        if (bondState == BluetoothDevice.BOND_NONE || bondState == BluetoothDevice.BOND_BONDED) {
+          int delay = 0;
+          if (bondState == BluetoothDevice.BOND_BONDED && Build.VERSION.SDK_INT <= Build.VERSION_CODES.N) {
+            delay = 1000;
+          }
+          postDelayed(() -> { gatt.discoverServices(); }, delay, TimeUnit.MILLISECONDS);
+        } else if (bondState == BluetoothDevice.BOND_BONDING) {
+          Log.i(TAG, "waiting for bonding to complete");
+        }
 
+        connectionState = BluetoothGatt.STATE_CONNECTED;
         tobleRunner.postTask(() -> onConnected(connection));
       } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
         Log.d(TAG,"disconnected from GATT server");
-
         tobleRunner.postTask(() -> onDisconnected(connection));
-        gatt.close();
+        releaseConnection();
+      } else {
+        Log.d(TAG, String.format("new connection state: %d", newState));
+        connectionState = newState;
       }
-
-      connectionState = newState;
     }
 
     @Override
@@ -265,6 +295,16 @@ public class TobleDriverImpl extends TobleDriver {
 
     Log.d(TAG, String.format("connecting to device %s", peerAddr));
 
+    if (connectionState == BluetoothGatt.STATE_CONNECTING) {
+      Log.w(TAG, "we are already connecting, please wait...");
+      return null;
+    }
+
+    if (connectionState == BluetoothGatt.STATE_CONNECTED) {
+      Log.d(TAG, "already connected, using exiting connection");
+      return connection;
+    }
+
     BluetoothDevice device = bluetoothAdapter.getRemoteDevice(peerAddr);
     if (device == null) {
       Log.w(TAG, String.format("cannot find the device: %s", peerAddr));
@@ -298,6 +338,11 @@ public class TobleDriverImpl extends TobleDriver {
   @Override
   public int getMtu(TobleConnection aConn) {
     Log.d(TAG, String.format("::getMtu, (mtu=%d)", gattMtu));
+
+    if (connectionState != BluetoothGatt.STATE_CONNECTED) {
+      Log.e(TAG, "trying to get MTU before connecting");
+      return 0;
+    }
 
     return gattMtu;
   }
@@ -339,6 +384,7 @@ public class TobleDriverImpl extends TobleDriver {
     Log.d(TAG, "::c1Write");
 
     if (connectionState != BluetoothGatt.STATE_CONNECTED) {
+      Log.e(TAG, "c1Write: not connected!");
       return otError.OT_ERROR_NONE;
     }
 
@@ -367,12 +413,12 @@ public class TobleDriverImpl extends TobleDriver {
     Log.d(TAG, "::c2Subscribe");
 
     if (connectionState != BluetoothGatt.STATE_CONNECTED) {
+      Log.e(TAG, "c2Subscribe: not connected!");
       return;
     }
 
     BluetoothGattCharacteristic c2 = bluetoothGattClient.getService(UUID_TOBLE_SERVICE).getCharacteristic(UUID_C2);
 
-    subscribeC2 = aSubscribe;
     setNotify(c2, aSubscribe);
   }
 

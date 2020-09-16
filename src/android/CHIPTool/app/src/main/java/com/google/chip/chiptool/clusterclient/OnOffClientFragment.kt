@@ -10,6 +10,7 @@ import chip.devicecontroller.ChipCommandType
 import chip.devicecontroller.ChipDeviceController
 import com.google.chip.chiptool.ChipClient
 import com.google.chip.chiptool.R
+import com.google.chip.chiptool.blescanner.CHIPBleDeviceInfoFragment
 import io.openthread.toble.TobleService
 import kotlinx.android.synthetic.main.on_off_client_fragment.*
 import kotlinx.android.synthetic.main.on_off_client_fragment.view.*
