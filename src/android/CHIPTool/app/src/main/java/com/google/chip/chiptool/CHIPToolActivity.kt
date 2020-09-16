@@ -25,7 +25,6 @@ import android.content.IntentFilter
 import android.net.VpnService
 import android.os.Bundle
 import android.util.Log
-import android.view.Menu
 import androidx.appcompat.app.AppCompatActivity
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.fragment.app.Fragment
@@ -35,7 +34,7 @@ import com.google.chip.chiptool.echoclient.EchoClientFragment
 import com.google.chip.chiptool.setuppayloadscanner.BarcodeFragment
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceDetailsFragment
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo
-import io.openthread.toble.TobleService
+import io.openthread.ip6oble.Ip6oBleService
 import kotlinx.android.synthetic.main.select_action_fragment.remoteBleAddressEd
 import java.io.IOException
 import java.net.DatagramPacket
@@ -53,10 +52,10 @@ class CHIPToolActivity :
 
   private var peerDeviceIp6Addr: String = "UNKNOWN"
 
-  private var tobleServiceReceiver = object : BroadcastReceiver() {
+  private var ip6oBleServiceReceiver = object : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
       if (intent != null) {
-        peerDeviceIp6Addr = intent.getStringExtra(TobleService.KEY_PEER_IP6_ADDR)!!
+        peerDeviceIp6Addr = intent.getStringExtra(Ip6oBleService.KEY_PEER_IP6_ADDR)!!
       }
     }
   }
@@ -76,17 +75,18 @@ class CHIPToolActivity :
 
   override fun onDestroy() {
     super.onDestroy()
-    stopTobleService()
+    stopIp6oBleService()
   }
 
   override fun onResume() {
     super.onResume()
-    LocalBroadcastManager.getInstance(this).registerReceiver(tobleServiceReceiver, IntentFilter(TobleService.EVENT_6OBLE_CONNECTED))
+    LocalBroadcastManager.getInstance(this).registerReceiver(ip6oBleServiceReceiver, IntentFilter(
+      Ip6oBleService.EVENT_6OBLE_CONNECTED))
   }
 
   override fun onPause() {
     super.onPause()
-    LocalBroadcastManager.getInstance(this).unregisterReceiver(tobleServiceReceiver)
+    LocalBroadcastManager.getInstance(this).unregisterReceiver(ip6oBleServiceReceiver)
   }
 
   override fun onCHIPDeviceInfoReceived(deviceInfo: CHIPDeviceInfo) {
@@ -110,12 +110,12 @@ class CHIPToolActivity :
     showFragment(OnOffClientFragment.newInstance())
   }
 
-  override fun handleStartTobleServiceClicked() {
-    startTobleService();
+  override fun handleStartIp6oBleServiceClicked() {
+    startIp6oBleService();
   }
 
-  override fun handleStopTobleServiceClicked() {
-    stopTobleService();
+  override fun handleStopIp6oBleServiceClicked() {
+    stopIp6oBleService();
   }
 
   override fun handleSendUdpClicked() {
@@ -157,11 +157,11 @@ class CHIPToolActivity :
     if (requestCode == REQUEST_CODE_COMMISSIONING) {
       // Simply ignore the commissioning result.
       // TODO: tracking commissioned devices.
-    } else if (requestCode == REQUEST_CODE_START_TOBLE) {
+    } else if (requestCode == REQUEST_CODE_START_IP6OBLE) {
       if (resultCode == Activity.RESULT_OK) {
-        var intent = Intent(this, TobleService::class.java)
-        intent.setAction(TobleService.ACTION_START)
-        intent.putExtra(TobleService.KEY_PEER_BLE_ADDR, getPeerBleAddress())
+        var intent = Intent(this, Ip6oBleService::class.java)
+        intent.setAction(Ip6oBleService.ACTION_START)
+        intent.putExtra(Ip6oBleService.KEY_PEER_BLE_ADDR, getPeerBleAddress())
         startService(intent)
       }
     }
@@ -175,19 +175,19 @@ class CHIPToolActivity :
         .commit()
   }
 
-  private fun startTobleService() {
-    // Start ToBLE service.
+  private fun startIp6oBleService() {
+    // Start IP6oBLE service.
     var intent = VpnService.prepare(this)
     if (intent != null) {
-      startActivityForResult(intent, REQUEST_CODE_START_TOBLE)
+      startActivityForResult(intent, REQUEST_CODE_START_IP6OBLE)
     } else {
-      onActivityResult(REQUEST_CODE_START_TOBLE, Activity.RESULT_OK, null)
+      onActivityResult(REQUEST_CODE_START_IP6OBLE, Activity.RESULT_OK, null)
     }
   }
 
-  private fun stopTobleService() {
-    var intent = Intent(this, TobleService::class.java)
-    intent.setAction(TobleService.ACTION_STOP)
+  private fun stopIp6oBleService() {
+    var intent = Intent(this, Ip6oBleService::class.java)
+    intent.setAction(Ip6oBleService.ACTION_STOP)
     startService(intent);
   }
 
@@ -197,7 +197,7 @@ class CHIPToolActivity :
 
   companion object {
     var REQUEST_CODE_COMMISSIONING = 0xB003
-    var REQUEST_CODE_START_TOBLE = 0xB004
+    var REQUEST_CODE_START_IP6OBLE = 0xB004
     // var TEST_REMOTE_DEVICE_IP = "fe80:0:0:0:1872:d5f4:559:3659" // "1983::2001:de8"
     var TEST_REMOTE_DEVICE_PORT = 11095
   }

@@ -54,7 +54,7 @@ dependencies {
     implementation "androidx.room:room-runtime:$room_version"
     annotationProcessor "androidx.room:room-compiler:$room_version"
 
-    implementation project(":toble")
+    implementation project(':ip6oble')
 
     implementation fileTree(dir: "libs", include: ["*.jar", "*.so"])
     implementation 'androidx.appcompat:appcompat:1.1.0'

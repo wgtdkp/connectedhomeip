@@ -41,20 +41,15 @@ import androidx.fragment.app.Fragment;
 import androidx.lifecycle.Observer;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.work.Data;
-import androidx.work.OneTimeWorkRequest;
 import androidx.work.WorkInfo;
-import androidx.work.WorkManager;
-import androidx.work.WorkRequest;
 import com.google.chip.chiptool.R;
 import com.google.chip.chiptool.commissioner.CommissionerActivity;
 import com.google.chip.chiptool.commissioner.thread.ThreadNetworkCredential;
 import com.google.gson.Gson;
-import io.openthread.toble.TobleService;
-import java.io.IOException;
+import io.openthread.ip6oble.Ip6oBleService;
 import java.net.DatagramPacket;
 import java.net.DatagramSocket;
 import java.net.InetAddress;
-import java.net.SocketException;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -63,7 +58,7 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
 
   private static final String TAG = CommissioningFragment.class.getSimpleName();
 
-  private static final int REQUEST_CODE_START_TOBLE = 0xB004;
+  private static final int REQUEST_CODE_START_IP6OBLE = 0xB004;
 
   private static final int TEST_REMOTE_DEVICE_PORT = 11095;
   private static final int TEST_COMMISSIONING_PORT = 11096;
@@ -86,17 +81,18 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
 
   private String joinerIp6Addr;
 
-  private BroadcastReceiver tobleServiceReceiver = new BroadcastReceiver() {
+  private BroadcastReceiver ip6oBleServiceReceiver = new BroadcastReceiver() {
     @Override
     public void onReceive(Context context, Intent intent) {
       if (intent == null) {
         return;
       }
 
-      if (intent.getAction().equals(TobleService.EVENT_6OBLE_CONNECTED)) {
-        onConnected(intent.getStringExtra(TobleService.KEY_LOCAL_IP6_ADDR), intent.getStringExtra(TobleService.KEY_PEER_IP6_ADDR));
-      } else if (intent.getAction().equals(TobleService.EVENT_6OBLE_DISCONNECTED)) {
-        onDisconnected(intent.getStringExtra(TobleService.KEY_LOCAL_IP6_ADDR), intent.getStringExtra(TobleService.KEY_PEER_IP6_ADDR));
+      if (intent.getAction().equals(Ip6oBleService.EVENT_6OBLE_CONNECTED)) {
+        onConnected(intent.getStringExtra(Ip6oBleService.KEY_LOCAL_IP6_ADDR), intent.getStringExtra(
+            Ip6oBleService.KEY_PEER_IP6_ADDR));
+      } else if (intent.getAction().equals(Ip6oBleService.EVENT_6OBLE_DISCONNECTED)) {
+        onDisconnected();
       } else {
         Log.w(TAG, "unexpected broadcast event: " + intent.getAction());
       }
@@ -196,11 +192,11 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
   public void onActivityResult(int requestCode, int resultCode, Intent data) {
     super.onActivityResult(requestCode, resultCode, data);
 
-    if (requestCode == REQUEST_CODE_START_TOBLE) {
+    if (requestCode == REQUEST_CODE_START_IP6OBLE) {
       if (resultCode == Activity.RESULT_OK) {
-        Intent intent = new Intent(getContext(), TobleService.class);
-        intent.setAction(TobleService.ACTION_START);
-        intent.putExtra(TobleService.KEY_PEER_BLE_ADDR, joinerBleDeviceAddr);
+        Intent intent = new Intent(getContext(), Ip6oBleService.class);
+        intent.setAction(Ip6oBleService.ACTION_START);
+        intent.putExtra(Ip6oBleService.KEY_PEER_BLE_ADDR, joinerBleDeviceAddr);
         getActivity().startService(intent);
       }
     }
@@ -216,36 +212,37 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
   @Override
   public void onResume() {
     super.onResume();
-    LocalBroadcastManager.getInstance(getContext()).registerReceiver(tobleServiceReceiver, new IntentFilter(TobleService.EVENT_6OBLE_CONNECTED));
+    LocalBroadcastManager.getInstance(getContext()).registerReceiver(ip6oBleServiceReceiver, new IntentFilter(
+        Ip6oBleService.EVENT_6OBLE_CONNECTED));
   }
 
   @Override
   public void onPause() {
     super.onPause();
-    LocalBroadcastManager.getInstance(getContext()).unregisterReceiver(tobleServiceReceiver);
+    LocalBroadcastManager.getInstance(getContext()).unregisterReceiver(ip6oBleServiceReceiver);
   }
 
   private void startCommissioning() {
-    startTobleService();
+    startIp6oBleService();
   }
 
   private void stopCommissioning() {
-    stopTobleService();
+    stopIp6oBleService();
   }
 
-  private void startTobleService() {
-    // Start ToBLE service.
+  private void startIp6oBleService() {
+    // Start IP6oBLE service.
     Intent intent = VpnService.prepare(getContext());
     if (intent != null) {
-      startActivityForResult(intent, REQUEST_CODE_START_TOBLE);
+      startActivityForResult(intent, REQUEST_CODE_START_IP6OBLE);
     } else {
-      onActivityResult(REQUEST_CODE_START_TOBLE, Activity.RESULT_OK, null);
+      onActivityResult(REQUEST_CODE_START_IP6OBLE, Activity.RESULT_OK, null);
     }
   }
 
-  private void stopTobleService() {
-    Intent intent = new Intent(getContext(), TobleService.class);
-    intent.setAction(TobleService.ACTION_STOP);
+  private void stopIp6oBleService() {
+    Intent intent = new Intent(getContext(), Ip6oBleService.class);
+    intent.setAction(Ip6oBleService.ACTION_STOP);
     getActivity().startService(intent);
   }
 
@@ -264,7 +261,7 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
     }
   }
 
-  private void onDisconnected(@NonNull String localIp6Addr, @NonNull String peerIp6Addr) {
+  private void onDisconnected() {
     Log.d(TAG, "IP link disconnected!");
     joinerIp6Addr = null;
     showCommissionDone(false, "IP link is down!");

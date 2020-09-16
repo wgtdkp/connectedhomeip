@@ -39,8 +39,8 @@ class SelectActionFragment : Fragment() {
       echoClientBtn.setOnClickListener { getCallback()?.handleEchoClientClicked() }
       onOffClusterBtn.setOnClickListener { getCallback()?.handleOnOffClicked() }
 
-      startTobleServiceBtn.setOnClickListener { getCallback()?.handleStartTobleServiceClicked() }
-      stopTobleServiceBtn.setOnClickListener { getCallback()?.handleStopTobleServiceClicked() }
+      startIp6oBleServiceBtn.setOnClickListener { getCallback()?.handleStartIp6oBleServiceClicked() }
+      stopIp6oBleServiceBtn.setOnClickListener { getCallback()?.handleStopIp6oBleServiceClicked() }
       sendUdpBtn.setOnClickListener { getCallback()?.handleSendUdpClicked() }
     }
   }
@@ -58,8 +58,8 @@ class SelectActionFragment : Fragment() {
     /** Notifies listener of send command button click. */
     fun handleOnOffClicked()
 
-    fun handleStartTobleServiceClicked()
-    fun handleStopTobleServiceClicked()
+    fun handleStartIp6oBleServiceClicked()
+    fun handleStopIp6oBleServiceClicked()
     fun handleSendUdpClicked()
   }
 

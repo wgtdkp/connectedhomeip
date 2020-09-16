@@ -1,4 +1,4 @@
-package io.openthread.toble;
+package io.openthread.ip6oble;
 
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -20,32 +20,31 @@ import java.util.Calendar;
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentLinkedDeque;
-import java.util.concurrent.Executor;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
 /**
- * This class implements the OpenThread platform driver required by ToBLE.
+ * This class implements the OpenThread platform driver required by IP6oBLE.
  *
- * Call TobleModule.setTobleDriver to tell OpenThread to use this driver.
+ * Call Ip6oBleModule.setIp6oBleDriver to tell OpenThread to use this driver.
  *
  */
-public class TobleDriverImpl extends TobleDriver {
+public class Ip6oBleDriverImpl extends Ip6oBleDriver {
 
   public static final UUID UUID_C1   = UUID.fromString("18ee2ef5-263d-4559-959f-4f9c429f9d11");
   public static final UUID UUID_C2   = UUID.fromString("18ee2ef5-263d-4559-959f-4f9c429f9d12");
   public static final UUID UUID_CCCD = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb");
-  public static final UUID UUID_TOBLE_SERVICE = UUID.fromString("0000fffb-0000-1000-8000-00805f9b34fb");
+  public static final UUID UUID_IP6OBLE_SERVICE = UUID.fromString("0000fffb-0000-1000-8000-00805f9b34fb");
 
   public static final byte[] CCCD_INDICATE = new byte[] {0x02, 0x00};
 
-  private static final String TAG = TobleDriverImpl.class.getSimpleName();
+  private static final String TAG = Ip6oBleDriverImpl.class.getSimpleName();
 
   private static final int DEFAULT_MTU = 251;
 
   private Context context;
-  private TobleRunner tobleRunner;
+  private Ip6oBleRunner ip6oBleRunner;
 
   private BluetoothManager bluetoothManager;
   private BluetoothAdapter bluetoothAdapter;
@@ -53,7 +52,7 @@ public class TobleDriverImpl extends TobleDriver {
   private BluetoothLeScanner leScanner;
 
   private int gattMtu = DEFAULT_MTU;
-  private TobleConnection connection;
+  private Ip6oBleConnection connection;
   private int connectionState = BluetoothProfile.STATE_DISCONNECTED;
 
   private ScheduledExecutorService executor = Executors.newSingleThreadScheduledExecutor();
@@ -98,15 +97,15 @@ public class TobleDriverImpl extends TobleDriver {
       //Log.d(TAG, String.format("received scan response from: %s", deviceAddr));
 
       byte[] data = result.getScanRecord().getBytes();
-      otTobleAdvPacket advPacket = new otTobleAdvPacket();
+      otBleAdvPacket advPacket = new otBleAdvPacket();
 
-      advPacket.setSrcAddress(TobleUtils.tobleAddrFromString(deviceAddr));
-      advPacket.setData(TobleUtils.getByteArray(data).cast());
+      advPacket.setSrcAddress(Ip6oBleUtils.ip6oBleAddrFromString(deviceAddr));
+      advPacket.setData(Ip6oBleUtils.getByteArray(data).cast());
       advPacket.setLength(data.length);
       advPacket.setRssi((byte)result.getRssi());
 
       // TODO(wgtdkp): filter out devices we don't care.
-      tobleRunner.postTask(() -> onAdvReceived(otTobleAdvType.OT_TOBLE_ADV_IND, advPacket));
+      ip6oBleRunner.postTask(() -> onAdvReceived(otBleAdvType.OT_BLE_ADV_IND, advPacket));
     }
 
     @Override
@@ -126,7 +125,7 @@ public class TobleDriverImpl extends TobleDriver {
       if (status != BluetoothGatt.GATT_SUCCESS) {
         Log.d(TAG, String.format("unexpected GATT error: %d", status));
 
-        tobleRunner.postTask(() -> onDisconnected(connection));
+        ip6oBleRunner.postTask(() -> onDisconnected(connection));
         releaseConnection();
         return;
       }
@@ -146,10 +145,10 @@ public class TobleDriverImpl extends TobleDriver {
         }
 
         connectionState = BluetoothGatt.STATE_CONNECTED;
-        tobleRunner.postTask(() -> onConnected(connection));
+        ip6oBleRunner.postTask(() -> onConnected(connection));
       } else if (newState == BluetoothProfile.STATE_DISCONNECTED) {
         Log.d(TAG,"disconnected from GATT server");
-        tobleRunner.postTask(() -> onDisconnected(connection));
+        ip6oBleRunner.postTask(() -> onDisconnected(connection));
         releaseConnection();
       } else {
         Log.d(TAG, String.format("new connection state: %d", newState));
@@ -201,13 +200,14 @@ public class TobleDriverImpl extends TobleDriver {
       }
 
       byte[] value = c1Queue.poll();
-      tobleRunner.postTask(() -> onC1WriteDone(connection));
+      ip6oBleRunner.postTask(() -> onC1WriteDone(connection));
 
       if (!c1Queue.isEmpty()) {
         value = c1Queue.peek();
         Log.d(TAG, String
-            .format("onCharacteristicWrite: c1Write, (length=%d), (hex=%s)", value.length, TobleUtils.getHexString(value)));
-        BluetoothGattCharacteristic c1 = bluetoothGattClient.getService(UUID_TOBLE_SERVICE)
+            .format("onCharacteristicWrite: c1Write, (length=%d), (hex=%s)", value.length, Ip6oBleUtils
+                .getHexString(value)));
+        BluetoothGattCharacteristic c1 = bluetoothGattClient.getService(UUID_IP6OBLE_SERVICE)
             .getCharacteristic(UUID_C1);
         c1.setValue(value);
 
@@ -221,7 +221,8 @@ public class TobleDriverImpl extends TobleDriver {
       Log.d(TAG, String.format("::onCharacteristicChanged, (uuid=%s)", characteristic.getUuid()));
 
       byte[] value = characteristic.getValue();
-      tobleRunner.postTask(() -> onC2Notification(connection, TobleUtils.getByteArray(value).cast(), value.length));
+      ip6oBleRunner
+          .postTask(() -> onC2Notification(connection, Ip6oBleUtils.getByteArray(value).cast(), value.length));
     }
 
     @Override
@@ -253,13 +254,13 @@ public class TobleDriverImpl extends TobleDriver {
 
       gattMtu = mtu;
 
-      tobleRunner.postTask(() -> onConnectionIsReady(connection));
+      ip6oBleRunner.postTask(() -> onConnectionIsReady(connection));
     }
   };
 
-  public TobleDriverImpl(Context context, TobleRunner tobleRunner) {
+  public Ip6oBleDriverImpl(Context context, Ip6oBleRunner ip6oBleRunner) {
     this.context = context;
-    this.tobleRunner = tobleRunner;
+    this.ip6oBleRunner = ip6oBleRunner;
   }
 
   @Override
@@ -287,8 +288,8 @@ public class TobleDriverImpl extends TobleDriver {
   }
 
   @Override
-  public TobleConnection createConnection(otTobleAddress aPeerAddress, otTobleConnectionConfig aConfig) {
-    String peerAddr = TobleUtils.tobleAddrToString(aPeerAddress);
+  public Ip6oBleConnection createConnection(otBleAddress aPeerAddress, otBleConnectionConfig aConfig) {
+    String peerAddr = Ip6oBleUtils.ip6oBleAddrToString(aPeerAddress);
 
     Log.d(TAG, String.format("connecting to device %s", peerAddr));
 
@@ -312,14 +313,14 @@ public class TobleDriverImpl extends TobleDriver {
 
     // device.createBond();
     bluetoothGattClient = device.connectGatt(context, false, bluetoothGattCallback, BluetoothDevice.TRANSPORT_LE);
-    connection = new TobleConnection();
+    connection = new Ip6oBleConnection();
     connectionState = BluetoothProfile.STATE_CONNECTING;
 
     return connection;
   }
 
   @Override
-  public void disconnect(TobleConnection aConn) {
+  public void disconnect(Ip6oBleConnection aConn) {
     Log.d(TAG,  "::disconnect");
 
     if (bluetoothGattClient != null) {
@@ -333,7 +334,7 @@ public class TobleDriverImpl extends TobleDriver {
   }
 
   @Override
-  public int getMtu(TobleConnection aConn) {
+  public int getMtu(Ip6oBleConnection aConn) {
     Log.d(TAG, String.format("::getMtu, (mtu=%d)", gattMtu));
 
     if (connectionState != BluetoothGatt.STATE_CONNECTED) {
@@ -383,7 +384,7 @@ public class TobleDriverImpl extends TobleDriver {
   }
 
   @Override
-  public otError c1Write(TobleConnection aConn, SWIGTYPE_p_unsigned_char aBuffer, int aLength) {
+  public otError c1Write(Ip6oBleConnection aConn, SWIGTYPE_p_unsigned_char aBuffer, int aLength) {
     Log.d(TAG, "::c1Write");
 
     if (connectionState != BluetoothGatt.STATE_CONNECTED) {
@@ -391,17 +392,17 @@ public class TobleDriverImpl extends TobleDriver {
       return otError.OT_ERROR_NONE;
     }
 
-    byte[] value = TobleUtils.getByteArray(ByteArray.frompointer(aBuffer), aLength);
+    byte[] value = Ip6oBleUtils.getByteArray(ByteArray.frompointer(aBuffer), aLength);
 
     if (!c1Queue.isEmpty())
     {
-      Log.d(TAG, String.format("there is ongoing C1 write, queueing: %s", TobleUtils.getHexString(value)));
+      Log.d(TAG, String.format("there is ongoing C1 write, queueing: %s", Ip6oBleUtils.getHexString(value)));
       c1Queue.offer(value);
       return otError.OT_ERROR_NONE;
     } else {
       Log.d(TAG, String
-          .format("c1Write, (length=%d), (hex=%s)", value.length, TobleUtils.getHexString(value)));
-      BluetoothGattCharacteristic c1 = bluetoothGattClient.getService(UUID_TOBLE_SERVICE)
+          .format("c1Write, (length=%d), (hex=%s)", value.length, Ip6oBleUtils.getHexString(value)));
+      BluetoothGattCharacteristic c1 = bluetoothGattClient.getService(UUID_IP6OBLE_SERVICE)
           .getCharacteristic(UUID_C1);
       c1.setValue(value);
 
@@ -412,7 +413,7 @@ public class TobleDriverImpl extends TobleDriver {
   }
 
   @Override
-  public void c2Subscribe(TobleConnection aConn, boolean aSubscribe) {
+  public void c2Subscribe(Ip6oBleConnection aConn, boolean aSubscribe) {
     Log.d(TAG, "::c2Subscribe");
 
     if (connectionState != BluetoothGatt.STATE_CONNECTED) {
@@ -420,7 +421,7 @@ public class TobleDriverImpl extends TobleDriver {
       return;
     }
 
-    BluetoothGattCharacteristic c2 = bluetoothGattClient.getService(UUID_TOBLE_SERVICE).getCharacteristic(UUID_C2);
+    BluetoothGattCharacteristic c2 = bluetoothGattClient.getService(UUID_IP6OBLE_SERVICE).getCharacteristic(UUID_C2);
 
     setNotify(c2, aSubscribe);
   }
@@ -452,7 +453,7 @@ public class TobleDriverImpl extends TobleDriver {
     }
     final byte[] finalValue = enable ? value : BluetoothGattDescriptor.DISABLE_NOTIFICATION_VALUE;
 
-    Log.d(TAG, String.format("subscribe to notification, (value=%s)", TobleUtils.getHexString(finalValue)));
+    Log.d(TAG, String.format("subscribe to notification, (value=%s)", Ip6oBleUtils.getHexString(finalValue)));
 
     descriptor.setValue(finalValue);
     bluetoothGattClient.setCharacteristicNotification(characteristic, enable);
@@ -460,7 +461,7 @@ public class TobleDriverImpl extends TobleDriver {
   }
 
   @Override
-  public otError advStart(otTobleAdvConfig aConfig) {
+  public otError advStart(otBleAdvConfig aConfig) {
     Log.d(TAG, "::advStart");
 
     // TODO(wgtdkp):
@@ -476,7 +477,7 @@ public class TobleDriverImpl extends TobleDriver {
   }
 
   @Override
-  public otError c2Notificate(TobleConnection aConn, SWIGTYPE_p_unsigned_char aBuffer, int aLength) {
+  public otError c2Notificate(Ip6oBleConnection aConn, SWIGTYPE_p_unsigned_char aBuffer, int aLength) {
     Log.d(TAG, "::c2Notificate");
 
     // TODO(wgtdkp):

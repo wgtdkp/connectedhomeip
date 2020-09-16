@@ -1,11 +1,6 @@
-package io.openthread.toble;
+package io.openthread.ip6oble;
 
-import java.math.BigInteger;
-import java.util.Arrays;
-import java.util.Collections;
-import java.util.List;
-
-class TobleUtils {
+class Ip6oBleUtils {
 
   public static ByteArray getByteArray(byte[] bytes) {
     return getByteArray(bytes, bytes.length);
@@ -55,23 +50,23 @@ class TobleUtils {
     return builder.toString();
   }
 
-  public static String tobleAddrToString(otTobleAddress tobleAddr) {
-    byte[] addr = getByteArray(tobleAddr.getAddress());
+  public static String ip6oBleAddrToString(otBleAddress bleAddress) {
+    byte[] addr = getByteArray(bleAddress.getAddress());
     return  String.format("%02X:%02X:%02X:%02X:%02X:%02X", addr[5], addr[4],
                           addr[3], addr[2], addr[1], addr[0]);
   }
 
-  public static otTobleAddress tobleAddrFromString(String addr) {
+  public static otBleAddress ip6oBleAddrFromString(String addr) {
     addr = addr.replace(":", "");
     byte[] buf = hexStringToByteArray(addr);
 
     buf = reverseByteArray(buf);
 
-    otTobleAddress tobleAddr = new otTobleAddress();
-    tobleAddr.setAddress(TobleUtils.getShortArray(buf));
-    tobleAddr.setType(otTobleAddressType.OT_TOBLE_ADDRESS_TYPE_PUBLIC);
+    otBleAddress ip6oBleAddr = new otBleAddress();
+    ip6oBleAddr.setAddress(Ip6oBleUtils.getShortArray(buf));
+    ip6oBleAddr.setType(otBleAddressType.OT_BLE_ADDRESS_TYPE_PUBLIC);
 
-    return tobleAddr;
+    return ip6oBleAddr;
   }
 
   public static byte[] hexStringToByteArray(String s) {
