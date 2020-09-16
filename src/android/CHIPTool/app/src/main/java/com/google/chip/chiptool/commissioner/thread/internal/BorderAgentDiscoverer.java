@@ -45,9 +45,11 @@ class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
   private NsdManager nsdManager;
   private BorderAgentListener borderAgentListener;
 
+  private boolean isScanning = false;
+
   public interface BorderAgentListener {
     void onBorderAgentFound(BorderAgentInfo borderAgentInfo);
-    void onBorderAgentLost(BorderAgentInfo borderAgentInfo);
+    void onBorderAgentLost(String discriminator);
   }
 
   @RequiresPermission(permission.INTERNET)
@@ -61,6 +63,13 @@ class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
   }
 
   public void start() {
+    if (isScanning) {
+      Log.w(TAG, "the Border Agent discoverer is already running!");
+      return;
+    }
+
+    isScanning = true;
+
     wifiMulticastLock.setReferenceCounted(true);
     wifiMulticastLock.acquire();
 
@@ -69,12 +78,18 @@ class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
   }
 
   public void stop() {
+    if (!isScanning) {
+      Log.w(TAG, "the Border Agent discoverer has already been stopped!");
+      return;
+    }
+
     nsdManager.stopServiceDiscovery(this);
 
     if (wifiMulticastLock != null) {
       wifiMulticastLock.release();
-      wifiMulticastLock = null;
     }
+
+    isScanning = false;
   }
 
   @Override
@@ -104,16 +119,22 @@ class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
 
           @Override
           public void onServiceResolved(NsdServiceInfo serviceInfo) {
-            Log.d(TAG, "successfully resolved service: " + serviceInfo.toString());
-            borderAgentListener.onBorderAgentFound(getBorderAgentInfo(serviceInfo));
+            BorderAgentInfo borderAgent = getBorderAgentInfo(serviceInfo);
+            if (borderAgent != null) {
+              Log.d(TAG, "successfully resolved service: " + serviceInfo.toString());
+              borderAgentListener.onBorderAgentFound(borderAgent);
+            }
           }
         });
   }
 
   @Override
   public void onServiceLost(NsdServiceInfo nsdServiceInfo) {
-    Log.d(TAG, "a Border Agent service is gone");
-    borderAgentListener.onBorderAgentLost(getBorderAgentInfo(nsdServiceInfo));
+    String discriminator = getBorderAgentDiscriminator(nsdServiceInfo);
+    if (discriminator != null) {
+      Log.d(TAG, "a Border Agent service is gone");
+      borderAgentListener.onBorderAgentLost(discriminator);
+    }
   }
 
   @Override
@@ -128,10 +149,16 @@ class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
 
   private BorderAgentInfo getBorderAgentInfo(NsdServiceInfo serviceInfo) {
     Map<String, byte[]> attrs = serviceInfo.getAttributes();
-    String discriminator = "CC11BB22";
+
+    // Use the host address as default discriminator.
+    String discriminator = serviceInfo.getHost().getHostAddress();
 
     if (attrs.containsKey(KEY_DISCRIMINATOR)) {
       discriminator = new String(attrs.get(KEY_DISCRIMINATOR));
+    }
+
+    if (!attrs.containsKey(KEY_NETWORK_NAME) || !attrs.containsKey(KEY_EXTENDED_PAN_ID)) {
+      return null;
     }
 
     return new BorderAgentInfo(
@@ -140,5 +167,22 @@ class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
         attrs.get(KEY_EXTENDED_PAN_ID),
         serviceInfo.getHost(),
         serviceInfo.getPort());
+  }
+
+  private String getBorderAgentDiscriminator(NsdServiceInfo serviceInfo) {
+    Map<String, byte[]> attrs = serviceInfo.getAttributes();
+
+    // Use the host address as default discriminator.
+    String discriminator = null;
+
+    if (serviceInfo.getHost() != null) {
+      discriminator = serviceInfo.getHost().getHostAddress();
+    }
+
+    if (attrs.containsKey(KEY_DISCRIMINATOR)) {
+      discriminator = new String(attrs.get(KEY_DISCRIMINATOR));
+    }
+
+    return discriminator;
   }
 }

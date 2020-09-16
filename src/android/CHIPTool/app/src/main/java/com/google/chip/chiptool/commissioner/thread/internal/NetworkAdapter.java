@@ -61,10 +61,10 @@ class NetworkAdapter extends BaseAdapter implements BorderAgentListener {
     new Handler(Looper.getMainLooper()).post(() -> notifyDataSetChanged());
   }
 
-  public void removeBorderAgent(BorderAgentInfo lostBorderAgent) {
+  public void removeBorderAgent(String lostBorderAgentDisciminator) {
     for (ThreadNetworkInfoHolder networkInfoHolder : networks) {
       for (BorderAgentInfo borderAgent : networkInfoHolder.borderAgents) {
-        if (borderAgent.equals(lostBorderAgent)) {
+        if (borderAgent.discriminator.equals(lostBorderAgentDisciminator)) {
           networkInfoHolder.borderAgents.remove(borderAgent);
           if (networkInfoHolder.borderAgents.isEmpty()) {
             networks.remove(networkInfoHolder);
@@ -108,7 +108,7 @@ class NetworkAdapter extends BaseAdapter implements BorderAgentListener {
   }
 
   @Override
-  public void onBorderAgentLost(BorderAgentInfo borderAgentInfo) {
-    removeBorderAgent(borderAgentInfo);
+  public void onBorderAgentLost(String discriminator) {
+    removeBorderAgent(discriminator);
   }
 }

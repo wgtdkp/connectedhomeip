@@ -39,7 +39,9 @@ public class TobleService extends VpnService implements TobleRunner {
   public static final String KEY_PEER_BLE_ADDR = "peer_ble_addr";
   public static final String KEY_PEER_IP6_ADDR = "peer_ip6_addr";
   public static final String KEY_LOCAL_IP6_ADDR = "local_ip6_addr";
-  public static final String ACTION_PEER_CONNECTED = "peer_connected";
+
+  public static final String EVENT_6OBLE_CONNECTED = "6oble_connected";
+  public static final String EVENT_6OBLE_DISCONNECTED = "6oble_disconnected";
 
   /** Maximum packet size is constrained by the MTU, which is given as a signed short. */
   private static final int MAX_PACKET_SIZE = 1024;
@@ -62,7 +64,7 @@ public class TobleService extends VpnService implements TobleRunner {
   private static final int STATE_IDLE = 0;
   private static final int STATE_CONNECTING = 1;
   private static final int STATE_CONNECTED = 2;
-  private static final int STATE_DISCONNECTED = 4;
+  private static final int STATE_DISCONNECTED = 3;
 
   private AtomicInteger state = new AtomicInteger(STATE_IDLE);
   private AtomicBoolean shouldStop = new AtomicBoolean(false);
@@ -153,6 +155,7 @@ public class TobleService extends VpnService implements TobleRunner {
       } catch (Exception e) {
         e.printStackTrace();
       } finally {
+        state.set(STATE_DISCONNECTED);
         tobleDriver.finalize();
         toble.deinit();
         destroyTunInterface();
@@ -307,7 +310,14 @@ public class TobleService extends VpnService implements TobleRunner {
   }
 
   private void sendConnectedBroadcast(String localAddr, String peerAddr) {
-    Intent intent = new Intent(ACTION_PEER_CONNECTED);
+    Intent intent = new Intent(EVENT_6OBLE_CONNECTED);
+    intent.putExtra(KEY_LOCAL_IP6_ADDR, localAddr);
+    intent.putExtra(KEY_PEER_IP6_ADDR, peerAddr);
+    LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
+  }
+
+  private void sendDisconnectedBroadcast(String localAddr, String peerAddr) {
+    Intent intent = new Intent(EVENT_6OBLE_DISCONNECTED);
     intent.putExtra(KEY_LOCAL_IP6_ADDR, localAddr);
     intent.putExtra(KEY_PEER_IP6_ADDR, peerAddr);
     LocalBroadcastManager.getInstance(this).sendBroadcast(intent);
@@ -336,6 +346,7 @@ public class TobleService extends VpnService implements TobleRunner {
       postTask(() -> {
         Log.d(TAG, "disconnecting from peer device: " + aPeerAddress);
         destroyTunInterface();
+        sendDisconnectedBroadcast(aLocalAddress, aPeerAddress);
         state.set(STATE_DISCONNECTED);
       });
     }

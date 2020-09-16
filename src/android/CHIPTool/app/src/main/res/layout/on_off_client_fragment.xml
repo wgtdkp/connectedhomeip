@@ -66,11 +66,4 @@
         android:minLines="4"
         android:textSize="20sp"/>
 
-    <fragment
-        android:id="@+id/ble_device_scanner"
-        android:name="com.google.chip.chiptool.blescanner.CHIPBleDeviceInfoFragment"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:layout_below="@id/commandStatusTv" />
-
 </RelativeLayout>

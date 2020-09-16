@@ -62,7 +62,6 @@ public class TobleDriverImpl extends TobleDriver {
 
   public void finalize() {
     if (bluetoothGattClient != null) {
-      scanStop();
 
       if (connectionState == BluetoothGatt.STATE_DISCONNECTED) {
         disconnect(connection);
@@ -284,8 +283,6 @@ public class TobleDriverImpl extends TobleDriver {
 
   @Override
   public void process() {
-    //Log.d(TAG, "::process");
-
     // TODO(wgtdkp):
   }
 
@@ -311,7 +308,7 @@ public class TobleDriverImpl extends TobleDriver {
       return null;
     }
 
-    Log.d(TAG, "start connection: " + Calendar.getInstance().getTimeInMillis());
+    Log.d(TAG, "create connection: " + Calendar.getInstance().getTimeInMillis());
 
     // device.createBond();
     bluetoothGattClient = device.connectGatt(context, false, bluetoothGattCallback, BluetoothDevice.TRANSPORT_LE);
@@ -351,6 +348,9 @@ public class TobleDriverImpl extends TobleDriver {
   public otError scanStart(int aInterval, int aWindow, boolean aActive) {
     Log.d(TAG,  String.format("start scanning: interval=%d, window=%d, active=%b", aInterval, aWindow, aActive));
 
+    // TODO: remove the scanner.
+    assert(false);
+
     if (connectionState != BluetoothProfile.STATE_DISCONNECTED) {
       Log.w(TAG, "starting scan when not disconnected");
       return otError.OT_ERROR_INVALID_STATE;
@@ -371,6 +371,9 @@ public class TobleDriverImpl extends TobleDriver {
   @Override
   public otError scanStop() {
     Log.d(TAG, "::scanStop");
+
+    // TODO: remove the scanner.
+    assert(false);
 
     BluetoothLeScanner leScanner = bluetoothAdapter.getBluetoothLeScanner();
 

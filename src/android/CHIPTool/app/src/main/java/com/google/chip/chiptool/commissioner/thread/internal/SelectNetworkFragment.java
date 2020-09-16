@@ -57,8 +57,6 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
   private byte[] userInputPskc;
   private Button addDeviceButton;
 
-  private String joinerBleDeviceAddr;
-
   private BorderAgentDiscoverer borderAgentDiscoverer;
 
   public SelectNetworkFragment() {
@@ -73,17 +71,36 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
   public void onCreate(Bundle savedInstanceState) {
     super.onCreate(savedInstanceState);
 
+    Log.d(TAG, "::onCreate");
+
     networksAdapter = new NetworkAdapter(getContext());
     borderAgentDiscoverer = new BorderAgentDiscoverer(getContext(), networksAdapter);
     borderAgentDiscoverer.start();
-
-    CommissionerActivity commissionerActivity = (CommissionerActivity) getActivity();
-    joinerBleDeviceAddr = commissionerActivity.getJoinerBleDeviceAddr();
   }
 
   @Override
   public void onDestroy() {
     super.onDestroy();
+
+    Log.d(TAG, "::onDestroy");
+
+    borderAgentDiscoverer.stop();
+  }
+
+  @Override
+  public void onResume() {
+    super.onResume();
+
+    Log.d(TAG, "::onResume");
+
+    borderAgentDiscoverer.start();
+  }
+
+  @Override
+  public void onPause() {
+    super.onPause();
+
+    Log.d(TAG, "::onPause");
 
     borderAgentDiscoverer.stop();
   }
@@ -125,8 +142,8 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
     view.findViewById(R.id.add_device_button).setOnClickListener(this);
   }
 
-  private void gotoCommissioning(@NonNull String peerBleAddr, @NonNull ThreadNetworkCredential credential) {
-    CommissioningFragment fragment = new CommissioningFragment(peerBleAddr, credential);
+  private void gotoCommissioning(@NonNull ThreadNetworkCredential credential) {
+    CommissioningFragment fragment = new CommissioningFragment(credential);
     getParentFragmentManager()
         .beginTransaction()
         .replace(R.id.commissioner_service_activity, fragment, fragment.getClass().getSimpleName())
@@ -174,10 +191,10 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
     try {
       BorderAgentInfo selectedBorderAgent = selectedNetwork.borderAgents.get(0);
       ThreadCommissionerServiceImpl commissionerService = new ThreadCommissionerServiceImpl(getContext());
-      BorderAgentRecord borderAgentRecord = commissionerService.getBorderAgentRecord(selectedBorderAgent).get();  // NetworkCredentialDatabase.getDatabase(getContext()).getNetworkCredential(selectedNetwork);
+      BorderAgentRecord borderAgentRecord = commissionerService.getBorderAgentRecord(selectedBorderAgent).get();
 
       if (borderAgentRecord != null && borderAgentRecord.getActiveOperationalDataset() != null) {
-        gotoCommissioning(joinerBleDeviceAddr, new ThreadNetworkCredential(borderAgentRecord.getActiveOperationalDataset()));
+        gotoCommissioning(new ThreadNetworkCredential(borderAgentRecord.getActiveOperationalDataset()));
       } else if (borderAgentRecord != null && borderAgentRecord.getPskc() != null) {
         gotoFetchingCredential(selectedBorderAgent, borderAgentRecord.getPskc());
       } else {
@@ -193,7 +210,7 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
 
   @Override
   public void onCancelClick(FetchCredentialDialogFragment fragment) {
-
+    // TODO:
   }
 
   @Override
@@ -209,7 +226,7 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
         e.printStackTrace();
       }
 
-      gotoCommissioning(joinerBleDeviceAddr, credential);
+      gotoCommissioning(credential);
     } else {
       Log.w(TAG, "failed to fetch credentials");
     }

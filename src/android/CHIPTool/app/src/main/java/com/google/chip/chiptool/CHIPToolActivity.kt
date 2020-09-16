@@ -81,7 +81,7 @@ class CHIPToolActivity :
 
   override fun onResume() {
     super.onResume()
-    LocalBroadcastManager.getInstance(this).registerReceiver(tobleServiceReceiver, IntentFilter(TobleService.ACTION_PEER_CONNECTED))
+    LocalBroadcastManager.getInstance(this).registerReceiver(tobleServiceReceiver, IntentFilter(TobleService.EVENT_6OBLE_CONNECTED))
   }
 
   override fun onPause() {
