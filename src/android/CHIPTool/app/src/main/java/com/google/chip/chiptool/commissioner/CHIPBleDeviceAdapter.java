@@ -32,8 +32,7 @@ public class CHIPBleDeviceAdapter extends BaseAdapter implements CHIPBleDeviceLi
   public void addBleDevice(CHIPBleDeviceInfo newBleDevice) {
     for (CHIPBleDeviceInfo bleDevice : bleDeviceInfos) {
       if (bleDevice.macAddr.equals(newBleDevice.macAddr)) {
-        bleDeviceInfos.removeElement(bleDevice);
-        break;
+        return;
       }
     }
 

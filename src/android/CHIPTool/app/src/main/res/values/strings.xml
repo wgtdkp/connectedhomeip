@@ -47,4 +47,7 @@
     <string name="commissioner_fetch_credential_done">done</string>
     <string name="commissioner_fetch_credential_cancel">cancel</string>
     <string name="commissioner_commissioning_fragment_label">Commissioning</string>
+    <string name="commissioner_location_permission_missing_alert_title">Location permission missing</string>
+    <string name="commissioner_location_permission_missing_alert_message">Location permission is required to scan BLE devices.</string>
+    <string name="commissioner_location_permission_missing_alert_try_again">Try again</string>
 </resources>

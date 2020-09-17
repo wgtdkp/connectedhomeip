@@ -55,7 +55,7 @@ class CHIPToolActivity :
   private var ip6oBleServiceReceiver = object : BroadcastReceiver() {
     override fun onReceive(context: Context?, intent: Intent?) {
       if (intent != null) {
-        peerDeviceIp6Addr = intent.getStringExtra(Ip6oBleService.KEY_PEER_IP6_ADDR)!!
+        peerDeviceIp6Addr = intent.getStringExtra(Ip6oBleService.KEY_PEER_IP6_ADDR)?: return
       }
     }
   }

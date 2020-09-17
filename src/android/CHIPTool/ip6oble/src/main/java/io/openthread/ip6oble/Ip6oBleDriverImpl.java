@@ -68,6 +68,8 @@ public class Ip6oBleDriverImpl extends Ip6oBleDriver {
         releaseConnection();
       }
     }
+
+    c1Queue.clear();
   }
 
   private String CharacteristicToString(BluetoothGattCharacteristic characteristic) {

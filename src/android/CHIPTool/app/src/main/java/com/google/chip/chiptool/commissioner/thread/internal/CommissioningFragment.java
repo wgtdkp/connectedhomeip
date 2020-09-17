@@ -44,6 +44,7 @@ import androidx.work.Data;
 import androidx.work.WorkInfo;
 import com.google.chip.chiptool.R;
 import com.google.chip.chiptool.commissioner.CommissionerActivity;
+import com.google.chip.chiptool.commissioner.thread.CommissionerUtils;
 import com.google.chip.chiptool.commissioner.thread.ThreadNetworkCredential;
 import com.google.gson.Gson;
 import io.openthread.ip6oble.Ip6oBleService;
@@ -62,6 +63,12 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
 
   private static final int TEST_REMOTE_DEVICE_PORT = 11095;
   private static final int TEST_COMMISSIONING_PORT = 11096;
+
+  // How long we show the "IP link established..." message.
+  private static final int IP_LINK_ESTABLISHED_DISPLAY_TIME = 2000; // In Milliseconds.
+
+  // How long we show the "Installing credentail..." message.
+  private static final int INSTALLING_CREDENTIAL_DISPLAY_TIME = 2000;
 
   private String joinerBleDeviceAddr;
   private ThreadNetworkCredential networkCredential;
@@ -272,7 +279,7 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
       DatagramSocket socket = null;
       try {
 
-        Thread.sleep(1000);
+        Thread.sleep(2000);
 
         new Handler(Looper.getMainLooper()).post(() -> {
           showInProgress("installing network credential...");
@@ -283,7 +290,11 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
         // We cannot use the address (2001:1983::de8) assigned to the TUN interface.
         socket.connect(InetAddress.getByName(joinerIp6Addr + "%tun0"), TEST_COMMISSIONING_PORT);
         DatagramPacket packet = new DatagramPacket(networkCredential.getActiveOperationalDataset(), networkCredential.getActiveOperationalDataset().length);
+
+        Log.d(TAG, "installing network credential: " + CommissionerUtils.getHexString(networkCredential.getActiveOperationalDataset()));
         socket.send(packet);
+
+        Thread.sleep(5000);
 
         return null;
       } catch (Exception e) {

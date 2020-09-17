@@ -1,11 +1,15 @@
 package com.google.chip.chiptool.commissioner;
 
+import android.Manifest.permission;
 import android.app.Activity;
+import android.app.AlertDialog;
+import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.widget.AdapterView;
 import android.widget.Button;
 import android.widget.ListView;
 import androidx.annotation.NonNull;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -19,6 +23,8 @@ import com.google.chip.chiptool.setuppayloadscanner.BarcodeFragment;
 public class SelectBleDeviceFragment extends Fragment implements View.OnClickListener {
 
   private static final String TAG = SelectBleDeviceFragment.class.getSimpleName();
+
+  private static final int REQUEST_CODE_LOCATION_PERMISSION = 9527;
 
   private Button commissionButton;
 
@@ -54,7 +60,6 @@ public class SelectBleDeviceFragment extends Fragment implements View.OnClickLis
 
     // TODO: initialize BLE device discoverer.
     bleDeviceDiscoverer = new CHIPBleDeviceDiscoverer(getContext(), bleDeviceAdapter);
-    bleDeviceDiscoverer.start();
   }
 
   @Override
@@ -101,6 +106,13 @@ public class SelectBleDeviceFragment extends Fragment implements View.OnClickLis
       selectedBleDevice = (CHIPBleDeviceInfo) adapterView.getItemAtPosition(position);
       commissionButton.setVisibility(View.VISIBLE);
     });
+
+
+    if (hasLocationPermission()) {
+      bleDeviceDiscoverer.start();
+    } else {
+      requestLocationPermission();
+    }
   }
 
   @Override
@@ -108,5 +120,38 @@ public class SelectBleDeviceFragment extends Fragment implements View.OnClickLis
     CommissionerActivity commissionerActivity = (CommissionerActivity) getActivity();
     commissionerActivity.setJoinerBleDeviceAddr(selectedBleDevice.macAddr);
     commissionerActivity.showFragment(new BarcodeFragment());
+  }
+
+  private boolean hasLocationPermission() {
+    return PackageManager.PERMISSION_GRANTED == ContextCompat.checkSelfPermission(getContext(),
+        permission.ACCESS_FINE_LOCATION);
+  }
+
+  private void requestLocationPermission() {
+    requestPermissions(new String[] {permission.ACCESS_FINE_LOCATION}, REQUEST_CODE_LOCATION_PERMISSION);
+  }
+
+  private void showLocationPermissionAlert() {
+    new AlertDialog.Builder(requireContext())
+        .setTitle(R.string.commissioner_location_permission_missing_alert_title)
+        .setMessage(R.string.commissioner_location_permission_missing_alert_message)
+        .setPositiveButton(R.string.commissioner_location_permission_missing_alert_try_again, (diag, which) -> {
+          requestLocationPermission();
+        }).setCancelable(false)
+        .create().show();
+  }
+
+  @Override
+  public void onRequestPermissionsResult(int requestCode, String[] permissions,
+      int[] grantResults) {
+    if (requestCode == REQUEST_CODE_LOCATION_PERMISSION) {
+      if (grantResults.length > 0 && grantResults[0] == PackageManager.PERMISSION_GRANTED) {
+        bleDeviceDiscoverer.start();
+      } else {
+        showLocationPermissionAlert();
+      }
+    } else {
+      super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+    }
   }
 }

@@ -120,6 +120,7 @@ public class Ip6oBleService extends VpnService implements Ip6oBleRunner {
       return;
     }
 
+    shouldStop.set(false);
     state.set(STATE_IDLE);
 
     Log.d(TAG, "start 6oBLE service with remote BLE address: " + peerBleAddr.toString());
@@ -266,7 +267,7 @@ public class Ip6oBleService extends VpnService implements Ip6oBleRunner {
     if (state.get() == STATE_CONNECTING || state.get() == STATE_CONNECTED) {
       taskQueue.add(task);
     } else {
-      Log.e(TAG, "6oBLE service is down, dropping task!");
+      Log.e(TAG, String.format("6oBLE service is down, dropping task! state=%s", state.get()));
     }
   }
 

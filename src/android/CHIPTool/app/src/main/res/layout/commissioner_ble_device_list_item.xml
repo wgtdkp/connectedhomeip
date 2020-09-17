@@ -16,7 +16,7 @@
 
   <TextView
       android:id="@+id/ble_device_mac_addr"
-      style="@style/info_text"
+      style="@style/mini_info_text"
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       app:layout_constraintStart_toStartOf="parent"

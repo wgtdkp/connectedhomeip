@@ -50,7 +50,7 @@ public class InputNetworkPasswordDialogFragment extends DialogFragment implement
 
     passwordText = view.findViewById(R.id.network_password);
 
-    builder.setTitle("network");
+    builder.setTitle("Enter Password");
     builder.setView(view);
     builder.setPositiveButton(R.string.commissioner_password_connect, this);
     builder.setNegativeButton(R.string.commissioner_password_cancel, this);

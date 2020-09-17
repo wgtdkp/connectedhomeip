@@ -43,7 +43,8 @@
         android:layout_alignParentTop="true"
         android:inputType="text"
         android:textSize="20sp"
-        android:text="F2:65:A0:09:FB:3E"/>
+        android:text="F2:65:A0:09:FB:3E"
+        android:visibility="gone" />
 
     <Button
         android:id="@+id/startIp6oBleServiceBtn"
@@ -51,7 +52,8 @@
         android:layout_width="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_marginTop="8dp"
-        android:text="Start IPoBLE Service" />
+        android:text="Start IPoBLE Service"
+        android:visibility="gone" />
 
     <Button
         android:id="@+id/stopIp6oBleServiceBtn"
@@ -59,7 +61,8 @@
         android:layout_width="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_marginTop="8dp"
-        android:text="Stop IPoBLE Service" />
+        android:text="Stop IPoBLE Service"
+        android:visibility="gone" />
 
     <Button
         android:id="@+id/sendUdpBtn"
@@ -67,5 +70,6 @@
         android:layout_width="wrap_content"
         android:layout_marginStart="8dp"
         android:layout_marginTop="8dp"
-        android:text="Send Udp" />
+        android:text="Send Udp"
+        android:visibility="gone" />
 </LinearLayout>

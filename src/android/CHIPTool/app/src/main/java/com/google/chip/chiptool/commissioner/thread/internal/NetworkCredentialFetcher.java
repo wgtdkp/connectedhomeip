@@ -27,7 +27,7 @@ class NetworkCredentialFetcher {
 
   public ThreadNetworkCredential fetchNetworkCredential(@NonNull BorderAgentInfo borderAgentInfo, @NonNull byte[] pskc) throws ThreadCommissionerException {
     ActiveOperationalDataset activeOperationalDataset = fetchNetworkCredential(borderAgentInfo.host, borderAgentInfo.port, pskc);
-    return new ThreadNetworkCredential(CommissionerUtils.getByteArray(activeOperationalDataset.getRawTlvs()));
+    return ThreadNetworkCredential.fromActiveOperationalDataset(activeOperationalDataset);
   }
 
   public void cancel() {
@@ -133,107 +133,3 @@ class NativeCommissionerHandler extends CommissionerHandler {
     Log.d(TAG, "Thread Network Dataset chanaged");
   }
 }
-
-/*
-class CommissionerWorker extends Worker {
-
-  private static final String TAG = CommissionerWorker.class.getSimpleName();
-
-  private CHIPDeviceInfo deviceInfo;
-  private ThreadNetworkInfo threadNetworkInfo;
-  private byte[] pskc;
-
-  private static Commissioner nativeCommissioner;
-
-  public CommissionerWorker(@NonNull Context context, @NonNull WorkerParameters workerParams) {
-    super(context, workerParams);
-
-    deviceInfo =
-        new Gson()
-            .fromJson(getInputData().getString(Constants.KEY_DEVICE_INFO), CHIPDeviceInfo.class);
-    threadNetworkInfo =
-        new Gson()
-            .fromJson(getInputData().getString(Constants.KEY_NETWORK_INFO), ThreadNetworkInfo.class);
-    pskc = new Gson().fromJson(getInputData().getString(Constants.KEY_PSKC), byte[].class);
-
-    nativeCommissioner = Commissioner.create(new NativeCommissionerHandler(this));
-
-    Config config = new Config();
-    config.setId("TestComm");
-    config.setDomainName("TestDomain");
-    config.setEnableCcm(false);
-    config.setPSKc(CommissionerUtils.getByteArray(pskc));
-    config.setLogger(new NativeCommissionerLogger());
-
-    nativeCommissioner.init(config);
-  }
-
-  String getPskd() {
-    return String.format("%09u", deviceInfo.getSetupPinCode());
-  }
-
-  @NonNull
-  @Override
-  public Result doWork() {
-    if (nativeCommissioner != null) {
-      nativeCommissioner.resign();
-    }
-
-    setProgressAsync(StateToData("petitioning..."));
-
-    String[] existingCommissionerId = new String[1];
-    Error error =
-        nativeCommissioner.petition(
-            existingCommissionerId, threadNetworkInfo.getHost().getHostAddress(), threadNetworkInfo.getPort());
-    if (error.getCode() != ErrorCode.kNone) {
-      return errorToResult(error);
-    }
-
-    // Store the PSKc after successfully connecting to the current Border Agent.
-    ThreadNetworkCredential networkCredential = new ThreadNetworkCredential(threadNetworkInfo.getNetworkName(), threadNetworkInfo
-        .getExtendedPanId(), pskc, null);
-    try {
-      NetworkCredentialDatabase.getDatabase(getApplicationContext()).insertNetworkCredential(networkCredential);
-    } catch (ExecutionException e) {
-      e.printStackTrace();
-    } catch (InterruptedException e) {
-      e.printStackTrace();
-    }
-
-    setProgressAsync(StateToData("commissioner connected"));
-
-    // TODO(wgtdkp): get active operational dataset
-    //ActiveOperationalDataset
-    //nativeCommissioner.getActiveDataset();
-
-    nativeCommissioner.resign();
-
-    return errorToResult(new Error(ErrorCode.kNone, ""));
-  }
-
-  @Override
-  public void onStopped() {
-    if (nativeCommissioner != null) {
-      nativeCommissioner.resign();
-    }
-  }
-
-  private Result errorToResult(Error error) {
-    Data.Builder dataBuilder = new Data.Builder();
-
-    if (error.getCode() == ErrorCode.kNone) {
-      dataBuilder.putString(Constants.KEY_COMMISSIONING_STATUS, "commission device success!");
-      dataBuilder.putBoolean(Constants.KEY_SUCCESS, true);
-      return Result.success(dataBuilder.build());
-    } else {
-      dataBuilder.putString(Constants.KEY_COMMISSIONING_STATUS, error.toString());
-      dataBuilder.putBoolean(Constants.KEY_SUCCESS, false);
-      return Result.failure(StateToData(error.toString()));
-    }
-  }
-
-  private Data StateToData(String state) {
-    return new Data.Builder().putString(Constants.KEY_COMMISSIONING_STATUS, state).build();
-  }
-}
-*/

@@ -113,6 +113,10 @@ class BorderAgentDiscoverer implements NsdManager.DiscoveryListener {
 
     Log.d(TAG, "mDNS resolve listener is " + listener);
 
+    if (executor.isTerminated()) {
+      executor = Executors.newSingleThreadExecutor();
+    }
+
     executor.submit(() -> {
       while (true) {
         if (!isResolvingService.get()) {
