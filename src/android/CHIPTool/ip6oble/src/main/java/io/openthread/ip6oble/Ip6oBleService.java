@@ -320,7 +320,8 @@ public class Ip6oBleService extends VpnService implements Ip6oBleRunner {
     public void onConnected(otError aError, Ip6oBleConnection aConn, String aLocalAddress, String aPeerAddress) {
       if (aError != aError.OT_ERROR_NONE) {
         postTask(() -> {
-          Log.e(TAG, "failed to connected to peer device");
+          Log.e(TAG, "failed to connect to peer device");
+          sendConnectedBroadcast(null, null);
           state.set(STATE_DISCONNECTED);
         });
       } else {

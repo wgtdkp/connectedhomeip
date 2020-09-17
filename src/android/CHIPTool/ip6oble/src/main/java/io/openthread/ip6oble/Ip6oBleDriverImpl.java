@@ -85,8 +85,11 @@ public class Ip6oBleDriverImpl extends Ip6oBleDriver {
   private void releaseConnection() {
     connectionState = BluetoothGatt.STATE_DISCONNECTED;
     connection = null;
-    bluetoothGattClient.close();
-    bluetoothGattClient = null;
+
+    if (bluetoothGattClient != null) {
+      bluetoothGattClient.close();
+      bluetoothGattClient = null;
+    }
   }
 
   private ScanCallback scanCallback = new ScanCallback() {

@@ -175,7 +175,15 @@ public class SelectNetworkFragment extends Fragment implements InputNetworkPassw
     ByteArray pskc = new ByteArray();
     Error error = Commissioner.generatePSKc(pskc, password, threadNetworkInfo.networkName, new ByteArray(extendedPanId));
     if (error.getCode() != ErrorCode.kNone) {
-      Log.e(TAG, String.format("failed to generate PSKc: %s", error.toString()));
+      Log.e(TAG, String.format("failed to generate PSKc: %s; network-name=%s, extended-pan-id=%s",
+                               error.toString(),
+                               threadNetworkInfo.networkName,
+                               CommissionerUtils.getHexString(threadNetworkInfo.extendedPanId)));
+    } else {
+      Log.d(TAG, String.format("generated pskc=%s, network-name=%s, extended-pan-id=%s",
+                               CommissionerUtils.getHexString(pskc),
+                               threadNetworkInfo.networkName,
+                               CommissionerUtils.getHexString(threadNetworkInfo.extendedPanId)));
     }
 
     return CommissionerUtils.getByteArray(pskc);
