@@ -293,6 +293,11 @@ public class Ip6oBleDriverImpl extends Ip6oBleDriver {
   }
 
   @Override
+  public String getBleMacAddress() {
+    return bluetoothAdapter.getAddress();
+  }
+
+  @Override
   public Ip6oBleConnection createConnection(otBleAddress aPeerAddress, otBleConnectionConfig aConfig) {
     String peerAddr = Ip6oBleUtils.ip6oBleAddrToString(aPeerAddress);
 
