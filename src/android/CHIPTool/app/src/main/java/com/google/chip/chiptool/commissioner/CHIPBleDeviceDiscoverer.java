@@ -21,7 +21,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-class CHIPBleDeviceDiscoverer {
+public class CHIPBleDeviceDiscoverer {
 
   private static final String TAG = CHIPBleDeviceDiscoverer.class.getSimpleName();
 

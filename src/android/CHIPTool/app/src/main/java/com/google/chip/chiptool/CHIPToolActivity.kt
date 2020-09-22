@@ -17,16 +17,9 @@
  */
 package com.google.chip.chiptool
 
-import android.app.Activity
-import android.content.BroadcastReceiver
-import android.content.Context
 import android.content.Intent
-import android.content.IntentFilter
-import android.net.VpnService
 import android.os.Bundle
-import android.util.Log
 import androidx.appcompat.app.AppCompatActivity
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.fragment.app.Fragment
 import com.google.chip.chiptool.clusterclient.OnOffClientFragment
 import com.google.chip.chiptool.commissioner.CommissionerActivity
@@ -34,31 +27,11 @@ import com.google.chip.chiptool.echoclient.EchoClientFragment
 import com.google.chip.chiptool.setuppayloadscanner.BarcodeFragment
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceDetailsFragment
 import com.google.chip.chiptool.setuppayloadscanner.CHIPDeviceInfo
-import io.openthread.ip6oble.Ip6oBleService
-import kotlinx.android.synthetic.main.select_action_fragment.remoteBleAddressEd
-import java.io.IOException
-import java.net.DatagramPacket
-import java.net.DatagramSocket
-import java.net.InetAddress
-import java.net.SocketException
-import java.util.concurrent.Callable
-import java.util.concurrent.Executors
-import java.util.concurrent.FutureTask
 
 class CHIPToolActivity :
     AppCompatActivity(),
     BarcodeFragment.Callback,
     SelectActionFragment.Callback {
-
-  private var peerDeviceIp6Addr: String = "UNKNOWN"
-
-  private var ip6oBleServiceReceiver = object : BroadcastReceiver() {
-    override fun onReceive(context: Context?, intent: Intent?) {
-      if (intent != null) {
-        peerDeviceIp6Addr = intent.getStringExtra(Ip6oBleService.KEY_PEER_IP6_ADDR)?: return
-      }
-    }
-  }
 
   override fun onCreate(savedInstanceState: Bundle?) {
     super.onCreate(savedInstanceState)
@@ -71,22 +44,6 @@ class CHIPToolActivity :
           .add(R.id.fragment_container, fragment, fragment.javaClass.simpleName)
           .commit()
     }
-  }
-
-  override fun onDestroy() {
-    super.onDestroy()
-    stopIp6oBleService()
-  }
-
-  override fun onResume() {
-    super.onResume()
-    LocalBroadcastManager.getInstance(this).registerReceiver(ip6oBleServiceReceiver, IntentFilter(
-      Ip6oBleService.EVENT_6OBLE_CONNECTED))
-  }
-
-  override fun onPause() {
-    super.onPause()
-    LocalBroadcastManager.getInstance(this).unregisterReceiver(ip6oBleServiceReceiver)
   }
 
   override fun onCHIPDeviceInfoReceived(deviceInfo: CHIPDeviceInfo) {
@@ -110,60 +67,12 @@ class CHIPToolActivity :
     showFragment(OnOffClientFragment.newInstance())
   }
 
-  override fun handleStartIp6oBleServiceClicked() {
-    startIp6oBleService();
-  }
-
-  override fun handleStopIp6oBleServiceClicked() {
-    stopIp6oBleService();
-  }
-
-  override fun handleSendUdpClicked() {
-    val sendAndReceive =
-      FutureTask(Callable<String> {
-        var socket: DatagramSocket? = null
-        try {
-          val hello = "hello".toByteArray()
-          socket = DatagramSocket(11095)
-          //socket.connect( InetAddress.getByName(ThreadVpnService.LOCAL_ADDR), 6666);
-          // We cannot use the address (2001:1983::de8) assigned to the TUN interface.
-          socket.connect(InetAddress.getByName(peerDeviceIp6Addr + "%tun0"), TEST_REMOTE_DEVICE_PORT)
-          val packet = DatagramPacket(hello, hello.size)
-          Log.i("SEND_UDP", "Sending hello to VPN service")
-          socket.send(packet)
-          "hello"
-        } catch (e: SocketException) {
-          e.toString()
-        } catch (e: IOException) {
-          e.toString()
-        } finally {
-          socket?.close()
-        }
-      })
-
-    var executor = Executors.newFixedThreadPool(2)
-    executor.execute(sendAndReceive)
-    try {
-      val response = sendAndReceive.get()
-      Log.d("SEND_UDP", String.format("sent: %s\n", response))
-    } catch (e: Exception) {
-      e.printStackTrace()
-    }
-  }
-
   override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
     super.onActivityResult(requestCode, resultCode, data)
 
     if (requestCode == REQUEST_CODE_COMMISSIONING) {
       // Simply ignore the commissioning result.
       // TODO: tracking commissioned devices.
-    } else if (requestCode == REQUEST_CODE_START_IP6OBLE) {
-      if (resultCode == Activity.RESULT_OK) {
-        var intent = Intent(this, Ip6oBleService::class.java)
-        intent.setAction(Ip6oBleService.ACTION_START)
-        intent.putExtra(Ip6oBleService.KEY_PEER_BLE_ADDR, getPeerBleAddress())
-        startService(intent)
-      }
     }
   }
 
@@ -173,26 +82,6 @@ class CHIPToolActivity :
         .replace(R.id.fragment_container, fragment, fragment.javaClass.simpleName)
         .addToBackStack(null)
         .commit()
-  }
-
-  private fun startIp6oBleService() {
-    // Start IP6oBLE service.
-    var intent = VpnService.prepare(this)
-    if (intent != null) {
-      startActivityForResult(intent, REQUEST_CODE_START_IP6OBLE)
-    } else {
-      onActivityResult(REQUEST_CODE_START_IP6OBLE, Activity.RESULT_OK, null)
-    }
-  }
-
-  private fun stopIp6oBleService() {
-    var intent = Intent(this, Ip6oBleService::class.java)
-    intent.setAction(Ip6oBleService.ACTION_STOP)
-    startService(intent);
-  }
-
-  private fun getPeerBleAddress(): String {
-    return remoteBleAddressEd.text.toString()
   }
 
   companion object {

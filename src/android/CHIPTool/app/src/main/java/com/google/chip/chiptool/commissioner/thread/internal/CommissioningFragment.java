@@ -279,7 +279,8 @@ public class CommissioningFragment extends Fragment implements Observer<WorkInfo
       DatagramSocket socket = null;
       try {
 
-        Thread.sleep(2000);
+        // Wait for showing the "IP link established..." message
+        Thread.sleep(4000);
 
         new Handler(Looper.getMainLooper()).post(() -> {
           showInProgress("installing network credential...");

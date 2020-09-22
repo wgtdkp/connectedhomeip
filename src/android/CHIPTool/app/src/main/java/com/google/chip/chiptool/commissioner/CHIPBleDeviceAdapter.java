@@ -24,7 +24,7 @@ public class CHIPBleDeviceAdapter extends BaseAdapter implements CHIPBleDeviceLi
 
   private LayoutInflater inflater;
 
-  CHIPBleDeviceAdapter(Context context) {
+  public CHIPBleDeviceAdapter(Context context) {
     inflater = (LayoutInflater) context.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
     bleDeviceInfos = new Vector<>();
   }
