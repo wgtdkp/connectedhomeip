@@ -44,7 +44,7 @@ jobs:
             - name: Bootstrap
               run: |
                   scripts/build/gn_bootstrap.sh
-                  apt-get update && apt-get install -y rsync swig
+                  apt-get update && apt-get install -y rsync swig sudo
             - name: Setup Build
               run: |
                   GN_ARGS="is_clang=true target_os=\"android\" target_cpu=\"${{ matrix.type }}\" android_ndk_root=\"/opt/android/android-ndk-r21b\" android_sdk_root=\"/opt/android/sdk\""
