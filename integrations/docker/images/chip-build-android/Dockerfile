@@ -21,6 +21,15 @@ RUN set -x \
     && test -d /opt/android/sdk/platforms/android-21 \
     && : # last line
 
+# Download and install android commandl ine tool
+RUN set -x \
+    && wget -O /tmp/android-tools.zip https://dl.google.com/android/repository/sdk-tools-linux-3859397.zip \
+    && cd /opt/android/sdk \
+    && unzip /tmp/android-tools.zip \
+    && rm -f /tmp/android-tools.zip \
+    && test -d /opt/android/sdk/tools \
+    && : # last line
+
 # Download and install android NDK
 RUN set -x \
     && cd /tmp \
