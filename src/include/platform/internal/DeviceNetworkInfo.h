@@ -97,7 +97,7 @@ public:
     uint8_t ThreadPSKc[kThreadPSKcLength];
     /**< The Thread pre-shared commissioner key (NOT NULL-terminated). */
     uint16_t ThreadPANId;  /**< The 16-bit Thread PAN ID, or kThreadPANId_NotSpecified */
-    uint8_t ThreadChannel; /**< The Thread channel (currently [11..26]), or kThreadChannel_NotSpecified */
+    uint16_t ThreadChannel; /**< The Thread channel (currently [11..26]), or kThreadChannel_NotSpecified */
     /**< The Thread Active Operational Dataset TLV list. Nullable.
      *   This field is preferred to be used for provisioning the
      *   Thread Network when it's not null.
