@@ -240,11 +240,11 @@ exit:
 CHIP_ERROR NetworkProvisioning::ParseThreadActiveOperationalDatasetTLVs(const uint8_t *threadTLVs, size_t threadTLVsLength,
     DeviceLayer::Internal::DeviceNetworkInfo & networkInfo)
 {
-    static constexpr uint8_t kThreadTlvExtendedLength = 0xFF;
-    static constexpr uint8_t kThreadTlvTypeNetworkName = ;
-    static constexpr uint8_t kThreadTlvTypeExtendedPanId = ;
-    static constexpr uint8_t kThreadTlvTypeMeshPrefix = ;
-    static constexpr uint8_t kThreadTlvExtendedLength = 0xFF;
+    static constexpr uint8_t kThreadTlvTypeExtendedPanId = 2;
+    static constexpr uint8_t kThreadTlvTypeNetworkName = 3;
+    static constexpr uint8_t kThreadTlvTypePSKc = 4;
+    static constexpr uint8_t kThreadTlvTypeMeshPrefix = 7;
+
     CHIP_ERROR err = CHIP_ERROR_INVALID_DATA_LIST;
     const uint8_t *end = threadTLVs + threadTLVsLength;
     const uint_8_t * cur = threadTLVs;
