@@ -237,6 +237,54 @@ exit:
 }
 
 #ifdef CHIP_ENABLE_OPENTHREAD
+CHIP_ERROR NetworkProvisioning::ParseThreadActiveOperationalDatasetTLVs(const uint8_t *threadTLVs, size_t threadTLVsLength,
+    DeviceLayer::Internal::DeviceNetworkInfo & networkInfo)
+{
+    static constexpr uint8_t kThreadTlvExtendedLength = 0xFF;
+    static constexpr uint8_t kThreadTlvTypeNetworkName = ;
+    static constexpr uint8_t kThreadTlvTypeExtendedPanId = ;
+    static constexpr uint8_t kThreadTlvTypeMeshPrefix = ;
+    static constexpr uint8_t kThreadTlvExtendedLength = 0xFF;
+    CHIP_ERROR err = CHIP_ERROR_INVALID_DATA_LIST;
+    const uint8_t *end = threadTLVs + threadTLVsLength;
+    const uint_8_t * cur = threadTLVs;
+
+    while ( cur < end)
+    {
+        uint8_t type;
+        uint16_t length;
+        const uint8_t *data;
+
+        type = cur[0];
+        ++cur;
+
+        VerifyOrExit(cur < end);
+        if (cur[0] == kThreadTlvExtendedLength)
+        {
+            VerifyOrExit(cur + 1 < end);
+            length = (static_cast<uint16_t>(cur[0]) << 8) | cur[1];
+            cur += 2;
+        }
+        else
+        {
+            length = cur[0];
+            ++cur;
+        }
+
+        VerifyOrExit(cur + length <= end);
+        data = cur;
+
+        switch (type)
+        {
+        case kThreadTlv
+        }
+
+
+        cur += length;
+    }
+
+}
+
 CHIP_ERROR NetworkProvisioning::DecodeThreadAssociationRequest(System::PacketBuffer * msgBuf)
 {
     CHIP_ERROR err                                       = CHIP_NO_ERROR;

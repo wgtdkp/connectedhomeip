@@ -22,6 +22,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include <support/ScopedBuffer.h>
+
 namespace chip {
 namespace DeviceLayer {
 namespace Internal {
@@ -96,6 +98,11 @@ public:
     /**< The Thread pre-shared commissioner key (NOT NULL-terminated). */
     uint16_t ThreadPANId;  /**< The 16-bit Thread PAN ID, or kThreadPANId_NotSpecified */
     uint8_t ThreadChannel; /**< The Thread channel (currently [11..26]), or kThreadChannel_NotSpecified */
+    /**< The Thread Active Operational Dataset TLV list. Nullable.
+     *   This field is preferred to be used for provisioning the
+     *   Thread Network when it's not null.
+     */
+    chip::Platform::ScopedMemoryBuffer<uint8_t> ThreadActiveOperationalDatasetTlvs;
 
     struct
     {
