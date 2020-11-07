@@ -142,7 +142,7 @@ private:
 
     static CHIP_ERROR ParseThreadActiveOperationalDatasetTLVs(const uint8_t *threadTLVs, size_t threadTLVsLength, DeviceLayer::Internal::DeviceNetworkInfo & networkInfo);
 
-    CHIP_ERROR DecodeThreadAssociationRequest(System::PacketBuffer * msgBuf);
+    CHIP_ERROR HandleThreadAssociationRequest(System::PacketBuffer * msgBuf);
 
 #if CONFIG_DEVICE_LAYER
     static void ConnectivityHandler(const DeviceLayer::ChipDeviceEvent * event, intptr_t arg);
