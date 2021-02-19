@@ -31,7 +31,7 @@
 // Include the non-inline definitions for the GenericPlatformManagerImpl<> template,
 // from which the GenericPlatformManagerImpl_POSIX<> template inherits.
 #if CHIP_DEVICE_CONFIG_ENABLE_MDNS
-#include "lib/mdns/platform/Mdns.h"
+#include <platform/Linux/MdnsImpl.h>
 #endif
 #include <platform/internal/GenericPlatformManagerImpl.cpp>
 
