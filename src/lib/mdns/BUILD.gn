@@ -28,12 +28,12 @@ static_library("mdns") {
 
   sources = [ "Advertiser.h" ]
 
-  if (chip_mdns == "none") {
+  if (chip_mdns_advertiser == "none") {
     sources += [
       "Advertiser_ImplNone.cpp",
       "Resolver_ImplNone.cpp",
     ]
-  } else if (chip_mdns == "minimal") {
+  } else if (chip_mdns_advertiser == "minimal") {
     sources += [
       "Advertiser_ImplMinimalMdns.cpp",
       "Resolver_ImplNone.cpp",

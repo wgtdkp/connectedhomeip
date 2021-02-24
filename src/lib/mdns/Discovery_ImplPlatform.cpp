@@ -294,7 +294,7 @@ CHIP_ERROR DiscoveryImplPlatform::StopPublishDevice()
 
 CHIP_ERROR DiscoveryImplPlatform::SetResolverDelegate(ResolverDelegate * delegate)
 {
-    VerifyOrReturnError(delegate == nullptr || mResolverDelegate == nullptr, CHIP_ERROR_INCORRECT_STATE);
+    VerifyOrReturnError(mResolverDelegate == nullptr, CHIP_ERROR_INCORRECT_STATE);
     mResolverDelegate = delegate;
     return CHIP_NO_ERROR;
 }
@@ -324,15 +324,13 @@ void DiscoveryImplPlatform::HandleNodeIdResolve(void * context, MdnsService * re
     if (error != CHIP_NO_ERROR)
     {
         ChipLogError(Discovery, "Node ID resolved failed with %s", chip::ErrorStr(error));
-        mgr->mResolverDelegate->OnNodeIdResolutionFailed(kUndefinedNodeId, error);
-        return;
+        mgr->mResolverDelegate->OnNodeIdResolved(error, kUndefinedNodeId, ResolvedNodeData{});
     }
 
     if (result == nullptr)
     {
         ChipLogError(Discovery, "Node ID resolve not found");
-        mgr->mResolverDelegate->OnNodeIdResolutionFailed(kUndefinedNodeId, CHIP_ERROR_UNKNOWN_RESOURCE_ID);
-        return;
+        mgr->mResolverDelegate->OnNodeIdResolved(CHIP_ERROR_UNKNOWN_RESOURCE_ID, kUndefinedNodeId, ResolvedNodeData{});
     }
 
     // Parse '%x-%x' from the name
@@ -361,20 +359,21 @@ void DiscoveryImplPlatform::HandleNodeIdResolve(void * context, MdnsService * re
         }
     }
 
-    ResolvedNodeData nodeData;
-    nodeData.mInterfaceId = result->mInterface;
-    nodeData.mAddress     = result->mAddress.ValueOr({});
-    nodeData.mPort        = result->mPort;
+        ResolvedNodeData nodeData;
+        nodeData.mAddress     = result->mAddress.ValueOr({});
+        nodeData.mAddressType = result->mAddressType;
+        nodeData.mPort        = result->mPort;
 
-    if (deliminatorFound)
-    {
-        ChipLogProgress(Discovery, "Node ID resolved for %" PRIX64, nodeId);
-        mgr->mResolverDelegate->OnNodeIdResolved(nodeId, nodeData);
-    }
-    else
-    {
-        ChipLogProgress(Discovery, "Invalid service entry from node %" PRIX64, nodeId);
-        mgr->mResolverDelegate->OnNodeIdResolved(kUndefinedNodeId, nodeData);
+        if (deliminatorFound)
+        {
+            ChipLogProgress(Discovery, "Node ID resolved for %" PRIX64, nodeId);
+            mgr->mResolverDelegate->OnNodeIdResolved(error, nodeId, nodeData);
+        }
+        else
+        {
+            ChipLogProgress(Discovery, "Invalid service entry from node %" PRIX64, nodeId);
+            mgr->mResolverDelegate->OnNodeIdResolved(error, kUndefinedNodeId, nodeData);
+        }
     }
 }
 
