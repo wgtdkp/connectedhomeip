@@ -57,9 +57,10 @@ constexpr uint64_t kUndefinedNodeId = 0;
 namespace chip {
 namespace Mdns {
 
-DiscoveryImplPlatform DiscoveryImplPlatform::sManager;
-
-DiscoveryImplPlatform::DiscoveryImplPlatform() = default;
+DiscoveryImplPlatform::DiscoveryImplPlatform()
+{
+    mCommissionInstanceName = GetRandU64();
+    CHIP_ERROR error        = ChipMdnsInit(HandleMdnsInit, HandleMdnsError, this);
 
 CHIP_ERROR DiscoveryImplPlatform::Init()
 {
@@ -380,6 +381,12 @@ void DiscoveryImplPlatform::HandleNodeIdResolve(void * context, MdnsService * re
 
 DiscoveryImplPlatform & DiscoveryImplPlatform::GetInstance()
 {
+    // TODO: Clean Mdns initialization order
+    // Previously sManager was a global object, but DiscoveryImplPlatform constructor calls
+    // platform-specific ChipMdnsInit() which for Linux initializes MdnsAvahi global object
+    // and that may lead to improper initialization, since the order in which global objects'
+    // constructors are called is undefined.
+    static DiscoveryImplPlatform sManager;
     return sManager;
 }
 
