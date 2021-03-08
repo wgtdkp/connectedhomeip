@@ -91,6 +91,12 @@ CHIP_ERROR DiscoveryImplPlatform::Start(Inet::InetLayer * inetLayer, uint16_t po
         ChipLogError(Discovery, "Failed to setup mdns hostname: %s", ErrorStr(error));
     }
 
+    error = SetupHostname();
+    if (error != CHIP_NO_ERROR)
+    {
+        ChipLogError(Discovery, "Failed to setup mdns hostname: %s", ErrorStr(error));
+    }
+
     return error;
 }
 
