@@ -125,6 +125,6 @@ void LightingManager::Set(bool aOn)
 void LightingManager::UpdateLight()
 {
     constexpr uint32_t kPwmWidthUs = 20000u;
-    const uint8_t level            = mState == kState_On ? mLevel : 0;
+    const uint8_t level            = mState != kState_On ? mLevel : 0;
     pwm_pin_set_usec(mPwmDevice, mPwmChannel, kPwmWidthUs, kPwmWidthUs * level / kMaxLevel, 0);
 }

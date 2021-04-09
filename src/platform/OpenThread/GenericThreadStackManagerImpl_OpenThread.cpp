@@ -1257,7 +1257,7 @@ CHIP_ERROR GenericThreadStackManagerImpl_OpenThread<ImplClass>::_SetupSrpHost(co
     VerifyOrExit(strlen(aHostName) < SrpClient::kMaxHostNameSize, error = CHIP_ERROR_INVALID_STRING_LENGTH);
 
     // Avoid adding the same host name multiple times
-    if (strcmp(mSrpClient.mHostName, aHostName) != 0)
+    // if (strcmp(mSrpClient.mHostName, aHostName) != 0)
     {
         strcpy(mSrpClient.mHostName, aHostName);
         error = MapOpenThreadError(otSrpClientSetHostName(mOTInst, aHostName));

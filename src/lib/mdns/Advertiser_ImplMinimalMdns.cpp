@@ -469,7 +469,7 @@ CHIP_ERROR AdvertiserMinMdns::Advertise(const CommissionAdvertisingParameters & 
 
     // TODO: need to detect colisions here
     char nameBuffer[64] = "";
-    size_t len          = snprintf(nameBuffer, sizeof(nameBuffer), "%016" PRIX64, GetRandU64());
+    size_t len          = snprintf(nameBuffer, sizeof(nameBuffer), "%" PRIX64, GetRandU64());
     if (len >= sizeof(nameBuffer))
     {
         return CHIP_ERROR_NO_MEMORY;

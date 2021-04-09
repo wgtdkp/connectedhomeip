@@ -57,10 +57,7 @@ constexpr uint64_t kUndefinedNodeId = 0;
 namespace chip {
 namespace Mdns {
 
-DiscoveryImplPlatform::DiscoveryImplPlatform()
-{
-    mCommissionInstanceName = GetRandU64();
-    CHIP_ERROR error        = ChipMdnsInit(HandleMdnsInit, HandleMdnsError, this);
+DiscoveryImplPlatform::DiscoveryImplPlatform() = default;
 
 CHIP_ERROR DiscoveryImplPlatform::Init()
 {
@@ -83,12 +80,6 @@ CHIP_ERROR DiscoveryImplPlatform::Start(Inet::InetLayer * inetLayer, uint16_t po
     if (error != CHIP_NO_ERROR)
     {
         ChipLogError(Discovery, "Failed to initialize platform mdns: %s", ErrorStr(error));
-    }
-
-    error = SetupHostname();
-    if (error != CHIP_NO_ERROR)
-    {
-        ChipLogError(Discovery, "Failed to setup mdns hostname: %s", ErrorStr(error));
     }
 
     error = SetupHostname();
@@ -200,7 +191,7 @@ CHIP_ERROR DiscoveryImplPlatform::Advertise(const CommissionAdvertisingParameter
     {
         return CHIP_ERROR_INCORRECT_STATE;
     }
-    snprintf(service.mName, sizeof(service.mName), "%016" PRIX64, mCommissionInstanceName);
+    snprintf(service.mName, sizeof(service.mName), "%" PRIX64, mCommissionInstanceName);
     if (params.GetCommissionAdvertiseMode() == CommssionAdvertiseMode::kCommissioning)
     {
         strncpy(service.mType, "_chipc", sizeof(service.mType));
@@ -278,8 +269,11 @@ CHIP_ERROR DiscoveryImplPlatform::Advertise(const OperationalAdvertisingParamete
 
     mOperationalAdvertisingParams = params;
     // TODO: There may be multilple device/fabrid ids after multi-admin.
-    snprintf(service.mName, sizeof(service.mName), "%08X%08X-%08X%08X", (uint32_t)(params.GetNodeId() >> 32),
-             (uint32_t)(params.GetNodeId()), (uint32_t)(params.GetFabricId() >> 32), (uint32_t)(params.GetFabricId()));
+    //snprintf(service.mName, sizeof(service.mName), "%08X%08X-%08X%08X", (uint32_t)(params.GetNodeId() >> 32),
+    //         (uint32_t)(params.GetNodeId()), (uint32_t)(params.GetFabricId() >> 32), (uint32_t)(params.GetFabricId()));
+    snprintf(service.mName, sizeof(service.mName), "%X-%X",
+             (uint32_t)(params.GetFabricId()), (uint32_t)(params.GetNodeId()));
+
     strncpy(service.mType, "_chip", sizeof(service.mType));
     service.mProtocol      = MdnsServiceProtocol::kMdnsProtocolTcp;
     service.mPort          = CHIP_PORT;

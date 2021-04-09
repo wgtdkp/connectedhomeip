@@ -184,7 +184,17 @@ CHIP_ERROR NetworkProvisioning::SendIPAddress(const Inet::IPAddress & addr)
     addrStr = addr.ToString(Uint8::to_char(buffer->Start()), buffer->AvailableDataLength());
     buffer->SetDataLength(static_cast<uint16_t>(strlen(addrStr) + 1));
 
-    ChipLogProgress(NetworkProvisioning, "Sending IP Address. Delegate %p\n", mDelegate);
+    // This `kIPAddressAssigned` message is just a workaround before CHIP having
+    // operational discovery/advertising for Thread device.
+    //
+    // We don't need to send the IP address in our "CHIP-over-Thread" demo.
+    // But current Network Provisioning flow requests such a `kIPAddressAssigned`
+    // being received on the commissioner side to complete. So let's keep the code
+    // here but just remove the logging message.
+    //
+    // We already commented out the Address parsing code on the commissioner side so
+    // that we are absolutely not depending on this workaround trick.
+    // ChipLogProgress(NetworkProvisioning, "Sending IP Address. Delegate %p\n", mDelegate);
     VerifyOrExit(mDelegate != nullptr, err = CHIP_ERROR_INCORRECT_STATE);
     VerifyOrExit(addrStr != nullptr, err = CHIP_ERROR_INVALID_ADDRESS);
 
