@@ -51,7 +51,8 @@ CHIP_ERROR ChipMdnsPublishService(const MdnsService * service)
 
 CHIP_ERROR ChipMdnsStopPublish()
 {
-    return CHIP_ERROR_NOT_IMPLEMENTED;
+    // TODO(wgtdkp): implement this API.
+    return CHIP_NO_ERROR;
 }
 
 CHIP_ERROR ChipMdnsBrowse(const char * type, MdnsServiceProtocol protocol, Inet::IPAddressType addressType,
