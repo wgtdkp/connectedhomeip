@@ -151,10 +151,10 @@ CHIP_ERROR DiscoveryImplPlatform::SetupHostname()
 {
 #if CHIP_DEVICE_CONFIG_ENABLE_THREAD
     static char hostname[17]; // Hostname is 64-bit EUI-64 expressed as a 16-character hexadecimal string.
-    uint8_t eui64[8];
-    chip::DeviceLayer::ThreadStackMgr().GetFactoryAssignedEUI64(eui64);
-    snprintf(hostname, sizeof(hostname), "%02X%02X%02X%02X%02X%02X%02X%02X", eui64[0], eui64[1], eui64[2], eui64[3], eui64[4],
-             eui64[5], eui64[6], eui64[7]);
+    uint8_t mac[8];
+    chip::DeviceLayer::ThreadStackMgr().GetPrimary802154MACAddress(mac);
+    snprintf(hostname, sizeof(hostname), "%02X%02X%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4],
+             mac[5], mac[6], mac[7]);
 #else
     uint8_t mac[6];    // 6 byte wifi mac
     char hostname[13]; // Hostname will be the hex representation of mac.
